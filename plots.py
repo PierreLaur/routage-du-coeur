@@ -4,9 +4,11 @@ import plotly.graph_objects as go
 
 
 def plot_tours(tours):
-    coords = pd.read_excel("data/centres.xlsx")
-    lats = coords["Latitude"]
-    longs = coords["Longitude"]
+    coords_centres = pd.read_excel("data/centres.xlsx")
+    coords_pdr = pd.read_excel("data/points_de_ramasse.xlsx")
+
+    lats = coords_centres["Latitude"].tolist() + coords_pdr["Latitude"].tolist()
+    longs = coords_centres["Longitude"].tolist() + coords_pdr["Longitude"].tolist()
     colors = [
         "red",
         "blue",
@@ -23,7 +25,7 @@ def plot_tours(tours):
     fig = px.scatter(
         y=lats,
         x=longs,
-        text=coords["Centre"],
+        text=coords_centres["Nom"].tolist() + coords_pdr["Nom"].tolist(),
         title="Restos du Cœur",
     )
 
@@ -32,8 +34,8 @@ def plot_tours(tours):
 
         fig.add_traces(
             go.Scatter(
-                y=lats[tour],
-                x=longs[tour],
+                y=[lats[t] for t in tour],
+                x=[longs[t] for t in tour],
                 mode="lines+markers",
                 line=dict(color=color),
                 name=f"Tour {i}",
