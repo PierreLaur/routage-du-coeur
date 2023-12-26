@@ -112,12 +112,10 @@ def solve_vrp(
 ):
     print("Modeling...")
 
-    # TODO : dispatch semi-hebdomadaire to the appropriate week
-
     model = cp_model.CpModel()
 
     pruned = prune_arcs(n + n_pdr, matrix)
-    print(f"    Pruned arcs : {100*len(pruned)/(n+n_pdr)**2:.2}%")
+    print(f"    Pruned arcs : {100*len(pruned)/(n+n_pdr)**2:.2f}%")
 
     ########## Arcs & Visit variables ###########
     visits = {}
@@ -146,9 +144,9 @@ def solve_vrp(
                         arcs[vd, node, node2] = (node, node2, lit)
 
             # If you don't visit the depot, visit nothing
-            model.AddBoolAnd(visits[v, d, c].Not() for c in range(n)).OnlyEnforceIf(
-                visits[v, d, 0].Not()
-            )
+            model.AddBoolAnd(
+                visits[v, d, node].Not() for node in range(n + n_pdr)
+            ).OnlyEnforceIf(visits[v, d, 0].Not())
             # for c in range(1, n):
             #     model.AddImplication(visits[v, 0].Not(), visits[v, c].Not())
 
@@ -179,6 +177,7 @@ def solve_vrp(
                 )
 
                 # Frais must be delivered with appropriate vehicles
+                # if True:
                 if frais[v]:
                     delivers["f"][v, d, c] = model.NewIntVar(
                         0,
@@ -239,6 +238,11 @@ def solve_vrp(
             sum(delivers["s"][v, d, c] for v in range(m) for d in range(n_days))
             == demands["s"][c]
         )
+        # model.Add(
+        #     sum(palettes[v, d, c] for v in range(m) for d in range(n_days))
+        #     * max_palette_capacity
+        #     >= demands["a"][c] + demands["f"][c]
+        # )
 
     # add_domsym_breaking(model, n, m, n_days, delivers, visits)
 
@@ -266,16 +270,18 @@ def solve_vrp(
     # solver.parameters.max_time_in_seconds = 180
     # solver.parameters.min_num_lns_workers = 8
 
-    solver.parameters.log_search_progress = True
-    # status = solver.Solve(model, LogPrinter())
-    status = solver.Solve(model)
+    print("Solving...")
+    # solver.parameters.log_search_progress = True
+    # status = solver.Solve(model)
+    status = solver.Solve(model, LogPrinter())
 
     if status not in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
         print("No solution found")
         exit()
 
     tours = {}
-    obj = solver.Value(total_distance) / 1000
+    obj = solver.Value(total_distance)
+
     for d in range(n_days):
         for v in range(m):
             tour = [0]
@@ -283,25 +289,28 @@ def solve_vrp(
 
             while True:
                 a = tour[-1]
-                found = False
-                for b in range(n + n_pdr):
+                goes_to = set()
+
+                for b in range(1, n + n_pdr):
                     if a == b:
-                        continue
-                    if a >= n and b <= n and b > 0:
                         continue
                     if (vd, a, b) not in arcs:
                         continue
                     arc = arcs[vd, a, b]
-                    # print(v, "\t", arc, a, b, solver.Value(arc[2]))
-                    if solver.Value(arc[2]):
-                        tour.append(b)
-                        found = True
-                        break
 
-                if not found:
+                    if solver.Value(arc[2]):
+                        goes_to.add(b)
+
+                if len(goes_to) > 1:
+                    print("Warning : ", vd, a, "goes to ", goes_to)
+                if len(goes_to) == 0:
                     break
+
+                tour.append(goes_to.pop())
                 if tour[-1] == 0:
                     break
+
+            # print(v, "\t", arc, a, b, solver.Value(arc[2]))
 
             tours[v, d] = tour
 
@@ -317,4 +326,5 @@ def solve_vrp(
         deliveries,
         {k: solver.Value(v) for k, v in visits.items()},
         {k: solver.Value(v[2]) for k, v in arcs.items()},
+        {k: solver.Value(palettes[k]) for k in palettes.keys()},
     )

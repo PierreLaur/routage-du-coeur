@@ -24,6 +24,8 @@ def route_vrp(
     manager = pywrapcp.RoutingIndexManager(n + n_pdr, m * n_days, 0)
     model = pywrapcp.RoutingModel(manager)
 
+    #################################################################
+
     def distance_callback(i, j):
         node_i = manager.IndexToNode(i)
         node_j = manager.IndexToNode(j)
@@ -46,6 +48,8 @@ def route_vrp(
         True,  # start cumul to zero
         "Capacity",
     )
+
+    #################################################################
 
     def make_routing_monitor(routing_model: pywrapcp.RoutingModel) -> callable:
         class RoutingMonitor:
@@ -83,8 +87,7 @@ def route_vrp(
             tour.append(manager.IndexToNode(index))
             # plan_output += f"Distance of the route: {route_distance}m\n"
 
-            d = vehicle_id % m
-            v = vehicle_id - d * m
+            d, v = divmod(vehicle_id, m)
             tours[v, d] = tour
         return obj, tours
 

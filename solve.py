@@ -6,16 +6,55 @@ from routing_solver import route_vrp
 import json
 
 
-def str_to_tuple(my_dict):
-    new_dict = {}
-    for k, v in my_dict.items():
-        key = k.strip("()").split(", ")
-        key = tuple(map(int, key))
-        new_dict[key] = v
-    return new_dict
+def solve_with_routing(
+    matrix,
+    n,
+    n_pdr,
+    m,
+    n_days,
+    demands,
+    freqs_pdr,
+    capacities,
+    sizes,
+    frais,
+    max_palette_capacity,
+    current_tours,
+    current_arcs,
+):
+    obj, tours = route_vrp(
+        matrix,
+        n,
+        n_pdr,
+        m,
+        n_days,
+        demands,
+        freqs_pdr,
+        capacities,
+        sizes,
+        frais,
+        max_palette_capacity,
+        hint=(current_tours, current_arcs),
+    )
+
+    for d in range(n_days):
+        print(f"-- JOUR {d} --")
+        for v in range(m):
+            if (v, d) in tours and len(tours[v, d]) > 2:
+                print(f"Vehicule {v} tour : \n", end="")
+                for t in tours[v, d][1:-1]:
+                    print("\t", matrix.index[t])
+    exit()
 
 
-if __name__ == "__main__":
+def tour_length(matrix, tour):
+    length = 0
+    for i in range(len(tour) - 1):
+        length += matrix.iloc[tour[i], tour[i + 1]]
+    length += matrix.iloc[tour[-1], tour[0]]
+    return length
+
+
+def solve_with_cp(ignore_centres):
     centres = pd.read_excel("data/centres.xlsx", index_col=0)
     points_de_ramasse = pd.read_excel("data/points_de_ramasse.xlsx", index_col=0)
     vehicles = pd.read_excel("data/vehicules.xlsx", index_col=0)
@@ -35,6 +74,13 @@ if __name__ == "__main__":
         "f": centres["Tonnage Frais (kg)"].fillna(0).astype(int).tolist(),
         "s": centres["Tonnage Surgelé (kg)"].fillna(0).astype(int).tolist(),
     }
+
+    # Ignore some centres (deliver them the other week) :
+    indexes = [centres.loc[centres["Nom"] == c].index.values[0] for c in ignore_centres]
+    for i in indexes:
+        demands["a"][i] = 0
+        demands["f"][i] = 0
+        demands["s"][i] = 0
 
     # Add 15% for robustness
     for c in range(1, n):
@@ -58,7 +104,7 @@ if __name__ == "__main__":
     current_arcs = json.load(open("data/arcs_tournees_actuelles.json", "r"))
     current_arcs = str_to_tuple(current_arcs)
 
-    tours, obj, deliveries, visits, arcs = solve_vrp(
+    tours, obj, deliveries, visits, arcs, palettes = solve_vrp(
         matrix,
         n,
         n_pdr,
@@ -73,24 +119,31 @@ if __name__ == "__main__":
         hint=(current_tours, current_arcs),
     )
 
-    # obj, tours = route_vrp(
-    #     matrix,
-    #     n,
-    #     n_pdr,
-    #     m,
-    #     n_days,
-    #     demands,
-    #     freqs_pdr,
-    #     capacities,
-    #     sizes,
-    #     frais,
-    #     max_palette_capacity,
-    #     hint=(current_tours, current_arcs),
-    # )
-    # for t in tours.values():
-    #     if len(t) > 2:
-    #         print(t)
-    # exit()
+    # Re-optimize tours
+    for d in range(n_days):
+        for v in range(m):
+            if len(tours[v, d]) == 1:
+                continue
+
+            i = 1
+            while i < len(tours[v, d]) - 1:
+                t = tours[v, d][i]
+                if t == 0 or t >= n:
+                    i += 1
+                    continue
+                # If the city is visited for nothing, skip it and adjust the objective value
+                elif sum(deliveries[i][v, d, t] for i in range(3)) == 0:
+                    obj = (
+                        obj
+                        - matrix.iloc[tours[v, d][i - 1], t]
+                        - matrix.iloc[t, tours[v, d][i + 1]]
+                        + matrix.iloc[tours[v, d][i - 1], tours[v, d][i + 1]]
+                    )
+                    tours[v, d].pop(i)
+                    print(f"\rRe-optimized tours to {obj/1000:.2f}km", end="")
+                else:
+                    i += 1
+    print()
 
     # check_solution(centres, vehicles, tours, obj, deliveries, visits, arcs)
 
@@ -100,15 +153,37 @@ if __name__ == "__main__":
             if len(tours[v, d]) == 1:
                 continue
             print(f"Vehicule {v} ({vehicles.index[v]}) tour : \n", end="")
+
             for t in tours[v, d]:
                 delivery = None
-                if t >= n:
-                    name = points_de_ramasse.index[t - n]
-                elif t == 0:
+                pals = 0
+                name = matrix.index[t]
+                if t == 0 or t >= n:
                     continue
                 else:
-                    name = centres["Nom"][t]
                     delivery = tuple(deliveries[i][v, d, t] for i in range(3))
-                print(f"\t{name:20} {str(delivery) if delivery else ''}")
+                    pals = palettes[v, d, t]
+                print(
+                    f"\t{name:20} {str(delivery) if delivery else ''} {' - ' + str(pals)+' palettes'}"
+                )
 
+    return obj, tours
+
+
+def str_to_tuple(my_dict):
+    new_dict = {}
+    for k, v in my_dict.items():
+        key = k.strip("()").split(", ")
+        key = tuple(map(int, key))
+        new_dict[key] = v
+    return new_dict
+
+
+if __name__ == "__main__":
+    free = ["Bagneres de Luchon", "L Isle en Dodon"]
+    centres_not_delivered_w1 = ["Cugnaux", "Levignac", "Rieumes"]
+    centres_not_delivered_w2 = ["Fonsorbes", "Bessieres", "Fronton"]
+    centres_semi_hebdo = free + centres_not_delivered_w1 + centres_not_delivered_w2
+
+    obj, tours = solve_with_cp(ignore_centres=centres_not_delivered_w1)
     plot_tours([tour for tour in tours.values() if len(tour) > 1])
