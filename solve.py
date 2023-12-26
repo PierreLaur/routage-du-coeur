@@ -2,47 +2,28 @@ import pandas as pd
 from plots import plot_tours
 from cp_solver import solve_vrp
 from routing_solver import route_vrp
+from problem import Problem
 
 import json
 
 
 def solve_with_routing(
-    matrix,
-    n,
-    n_pdr,
-    m,
-    n_days,
-    demands,
-    freqs_pdr,
-    capacities,
-    sizes,
-    frais,
-    max_palette_capacity,
+    problem: Problem,
     current_tours,
     current_arcs,
 ):
     obj, tours = route_vrp(
-        matrix,
-        n,
-        n_pdr,
-        m,
-        n_days,
-        demands,
-        freqs_pdr,
-        capacities,
-        sizes,
-        frais,
-        max_palette_capacity,
+        problem,
         hint=(current_tours, current_arcs),
     )
 
-    for d in range(n_days):
+    for d in range(problem.n_days):
         print(f"-- JOUR {d} --")
-        for v in range(m):
+        for v in range(problem.m):
             if (v, d) in tours and len(tours[v, d]) > 2:
                 print(f"Vehicule {v} tour : \n", end="")
                 for t in tours[v, d][1:-1]:
-                    print("\t", matrix.index[t])
+                    print("\t", problem.matrix.index[t])
     exit()
 
 
@@ -97,14 +78,7 @@ def solve_with_cp(ignore_centres):
 
     frais = [f == "Oui" for f in vehicles["Frais"]]
 
-    current_tours = open("data/tours_tournees_actuelles.json", "r")
-    current_tours = json.load(current_tours)
-    current_tours = str_to_tuple(current_tours)
-
-    current_arcs = json.load(open("data/arcs_tournees_actuelles.json", "r"))
-    current_arcs = str_to_tuple(current_arcs)
-
-    tours, obj, deliveries, visits, arcs, palettes = solve_vrp(
+    problem = Problem(
         matrix,
         n,
         n_pdr,
@@ -116,6 +90,17 @@ def solve_with_cp(ignore_centres):
         sizes,
         frais,
         max_palette_capacity,
+    )
+
+    current_tours = open("data/tours_tournees_actuelles.json", "r")
+    current_tours = json.load(current_tours)
+    current_tours = str_to_tuple(current_tours)
+
+    current_arcs = json.load(open("data/arcs_tournees_actuelles.json", "r"))
+    current_arcs = str_to_tuple(current_arcs)
+
+    tours, obj, deliveries, visits, arcs, palettes = solve_vrp(
+        problem,
         hint=(current_tours, current_arcs),
     )
 
@@ -185,5 +170,5 @@ if __name__ == "__main__":
     centres_not_delivered_w2 = ["Fonsorbes", "Bessieres", "Fronton"]
     centres_semi_hebdo = free + centres_not_delivered_w1 + centres_not_delivered_w2
 
-    obj, tours = solve_with_cp(ignore_centres=centres_not_delivered_w1)
+    obj, tours = solve_with_cp(ignore_centres=["Fronton"])
     plot_tours([tour for tour in tours.values() if len(tour) > 1])

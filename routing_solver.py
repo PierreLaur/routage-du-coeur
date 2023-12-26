@@ -4,19 +4,16 @@ from time import time
 
 
 def route_vrp(
-    matrix,
-    n,
-    n_pdr,
-    m,
-    n_days,
-    demands,
-    freqs_pdr,
-    capacities,
-    sizes,
-    frais,
-    max_palette_capacity,
+    problem,
     hint=None,
 ):
+    n = problem.n
+    n_days = problem.n_days
+    n_pdr = problem.n_pdr
+    m = problem.m
+    demands = problem.demands
+    capacities = problem.capacities
+
     matrix = [
         [int(matrix.iloc[r, c]) for c in range(len(matrix.index))]
         for r in range(len(matrix.index))
