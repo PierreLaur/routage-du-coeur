@@ -1,9 +1,8 @@
 import pandas as pd
-from plots import plot_tours
-from cp_solver import solve_vrp
-from routing_solver import route_vrp
-from problem import Problem
-
+from utils.plots import plot_tours
+from utils.problem import Problem
+from models.cp_solver import solve_vrp
+from models.routing_solver import route_vrp
 import json
 
 
@@ -20,9 +19,9 @@ def solve_with_routing(
     for d in range(problem.n_days):
         print(f"-- JOUR {d} --")
         for v in range(problem.m):
-            if (v, d) in tours and len(tours[v, d]) > 2:
+            if (d, v) in tours and len(tours[d, v]) > 2:
                 print(f"Vehicule {v} tour : \n", end="")
-                for t in tours[v, d][1:-1]:
+                for t in tours[d, v][1:-1]:
                     print("\t", problem.matrix.index[t])
     exit()
 
@@ -33,6 +32,30 @@ def tour_length(matrix, tour):
         length += matrix.iloc[tour[i], tour[i + 1]]
     length += matrix.iloc[tour[-1], tour[0]]
     return length
+
+
+def print_tour_to_console(file):
+    # TODO
+    # for d in range(n_days):
+    #     print(f"-- JOUR {d} --")
+    #     for v in range(m):
+    #         if len(tours[d, v]) == 1:
+    #             continue
+    #         print(f"Vehicule {v} ({vehicles.index[v]}) tour : \n", end="")
+
+    #         for t in tours[d, v]:
+    #             delivery = None
+    #             pals = 0
+    #             name = matrix.index[t]
+    #             if t == 0 or t >= n:
+    #                 continue
+    #             else:
+    #                 delivery = tuple(deliveries[i][d, v, t] for i in range(3))
+    #                 pals = palettes[d, v, t]
+    #             print(
+    #                 f"\t{name:20} {str(delivery) if delivery else ''} {' - ' + str(pals)+' palettes'}"
+    #             )
+    pass
 
 
 def solve_with_cp(ignore_centres):
@@ -92,65 +115,17 @@ def solve_with_cp(ignore_centres):
         max_palette_capacity,
     )
 
-    current_tours = open("data/tours_tournees_actuelles.json", "r")
+    current_tours = open("data/tours_tournees_actuelles_w1.json", "r")
     current_tours = json.load(current_tours)
     current_tours = str_to_tuple(current_tours)
 
     current_arcs = json.load(open("data/arcs_tournees_actuelles.json", "r"))
     current_arcs = str_to_tuple(current_arcs)
 
-    tours, obj, deliveries, visits, arcs, palettes = solve_vrp(
+    tours, obj = solve_vrp(
         problem,
         hint=(current_tours, current_arcs),
     )
-
-    # Re-optimize tours
-    for d in range(n_days):
-        for v in range(m):
-            if len(tours[v, d]) == 1:
-                continue
-
-            i = 1
-            while i < len(tours[v, d]) - 1:
-                t = tours[v, d][i]
-                if t == 0 or t >= n:
-                    i += 1
-                    continue
-                # If the city is visited for nothing, skip it and adjust the objective value
-                elif sum(deliveries[i][v, d, t] for i in range(3)) == 0:
-                    obj = (
-                        obj
-                        - matrix.iloc[tours[v, d][i - 1], t]
-                        - matrix.iloc[t, tours[v, d][i + 1]]
-                        + matrix.iloc[tours[v, d][i - 1], tours[v, d][i + 1]]
-                    )
-                    tours[v, d].pop(i)
-                    print(f"\rRe-optimized tours to {obj/1000:.2f}km", end="")
-                else:
-                    i += 1
-    print()
-
-    # check_solution(centres, vehicles, tours, obj, deliveries, visits, arcs)
-
-    for d in range(n_days):
-        print(f"-- JOUR {d} --")
-        for v in range(m):
-            if len(tours[v, d]) == 1:
-                continue
-            print(f"Vehicule {v} ({vehicles.index[v]}) tour : \n", end="")
-
-            for t in tours[v, d]:
-                delivery = None
-                pals = 0
-                name = matrix.index[t]
-                if t == 0 or t >= n:
-                    continue
-                else:
-                    delivery = tuple(deliveries[i][v, d, t] for i in range(3))
-                    pals = palettes[v, d, t]
-                print(
-                    f"\t{name:20} {str(delivery) if delivery else ''} {' - ' + str(pals)+' palettes'}"
-                )
 
     return obj, tours
 
@@ -170,5 +145,4 @@ if __name__ == "__main__":
     centres_not_delivered_w2 = ["Fonsorbes", "Bessieres", "Fronton"]
     centres_semi_hebdo = free + centres_not_delivered_w1 + centres_not_delivered_w2
 
-    obj, tours = solve_with_cp(ignore_centres=["Fronton"])
-    plot_tours([tour for tour in tours.values() if len(tour) > 1])
+    obj, tours = solve_with_cp(ignore_centres=centres_not_delivered_w1)
