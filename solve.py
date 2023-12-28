@@ -1,9 +1,10 @@
 import pandas as pd
 from utils.plots import plot_tours
 from utils.problem import Problem
-from models.cp_solver import solve_vrp
+from models.cp_solver import solve_vrp, solve_vrp_single_serve
 from models.routing_solver import route_vrp
 import json
+from math import ceil
 
 
 def solve_with_routing(
@@ -88,9 +89,9 @@ def solve_with_cp(ignore_centres):
 
     # Add 15% for robustness
     for c in range(1, n):
-        demands["a"][c] = int(demands["a"][c] * 1.15)
-        demands["f"][c] = int(demands["f"][c] * 1.15)
-        demands["s"][c] = int(demands["s"][c] * 1.15)
+        demands["a"][c] = ceil(demands["a"][c] * 1.15)
+        demands["f"][c] = ceil(demands["f"][c] * 1.15)
+        demands["s"][c] = ceil(demands["s"][c] * 1.15)
 
     for d in demands.values():
         d[0] = 0
@@ -115,16 +116,15 @@ def solve_with_cp(ignore_centres):
         max_palette_capacity,
     )
 
-    current_tours = open("data/tours_tournees_actuelles_w1.json", "r")
-    current_tours = json.load(current_tours)
-    current_tours = str_to_tuple(current_tours)
+    # current_tours = open("data/tours_tournees_actuelles_w1.json", "r")
+    # current_tours = json.load(current_tours)
+    # current_tours = str_to_tuple(current_tours)
 
-    current_arcs = json.load(open("data/arcs_tournees_actuelles.json", "r"))
-    current_arcs = str_to_tuple(current_arcs)
+    # current_arcs = json.load(open("data/arcs_tournees_actuelles.json", "r"))
+    # current_arcs = str_to_tuple(current_arcs)
 
     tours, obj = solve_vrp(
         problem,
-        hint=(current_tours, current_arcs),
     )
 
     return obj, tours

@@ -30,6 +30,7 @@ def check_solution_file(
     }
 
     ignore_centres = ["Cugnaux", "Levignac", "Rieumes"]
+
     # Ignore some centres (deliver them the other week) :
     indexes = [centres.loc[centres["Nom"] == c].index.values[0] for c in ignore_centres]
     for i in indexes:
