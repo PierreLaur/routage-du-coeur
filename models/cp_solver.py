@@ -187,7 +187,7 @@ def read_tours(pb, arcs, solver):
     return tours
 
 
-def write_sol(pb, solver, obj, tours, delivers, palettes):
+def write_sol(pb, solver, obj, tours, delivers, palettes, outfile):
     sol = {"total_distance": obj}
     sol["tours"] = {}
     for (d, v), tour in tours.items():
@@ -211,7 +211,7 @@ def write_sol(pb, solver, obj, tours, delivers, palettes):
             t.append(place)
         sol["tours"][str(d) + ", " + str(v)] = t
 
-    json.dump(sol, open("solutions/pretty_good_solution.json", "w"))
+    json.dump(sol, open(outfile, "w"))
 
 
 def reoptimize_tours(pb, solver, tours, delivers, obj):
@@ -248,7 +248,8 @@ def reoptimize_tours(pb, solver, tours, delivers, obj):
 
 def solve_vrp(
     pb,
-    hint="solutions/pretty_good_solution.json",
+    hint=None,
+    outfile=None,
 ):
     print("Modeling...")
 
@@ -354,16 +355,27 @@ def solve_vrp(
                     visits[d, v, c].Not()
                 )
 
-    for pdr in range(pb.n, pb.n + pb.n_pdr):
-        # Visit pdrs enough times
-        model.Add(
-            sum(visits[d, v, pdr] for v in range(pb.m) for d in range(pb.n_days))
-            >= pb.freqs_pdr[pdr - pb.n]
-        )
-
-        # But not twice a day
+    for pdr in range(pb.n_pdr):
+        # Visit pdrs at required days
         for d in range(pb.n_days):
-            model.AddAtMostOne(visits[d, v, pdr] for v in range(pb.m))
+            n_ramasses = pb.j_de_ramasse[pdr].count(d)
+            if (d, pdr) in pb.use_pl:
+                n_ramasses -= 1
+                model.Add(visits[d, 0, pdr + pb.n] == 1)
+            else:
+                model.Add(visits[d, 0, pdr + pb.n] == 0)
+            # Enough ramasses with camions frigos
+            model.Add(
+                sum(visits[d, v, pdr + pb.n] for v in range(1, pb.m) if pb.frais[v])
+                == n_ramasses
+            )
+
+            # No ramasses with camions not frais
+            model.AddBoolAnd(
+                visits[d, v, pdr + pb.n].Not()
+                for v in range(1, pb.m)
+                if not pb.frais[v]
+            )
 
     # # Add hints
     if hint:
@@ -437,7 +449,8 @@ def solve_vrp(
 
     tours, obj = reoptimize_tours(pb, solver, tours, delivers, obj)
 
-    write_sol(pb, solver, obj, tours, delivers, palettes)
+    if outfile:
+        write_sol(pb, solver, obj, tours, delivers, palettes, outfile)
 
     return (
         tours,

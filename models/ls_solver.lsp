@@ -4,19 +4,15 @@ use io;
 use localsolver;
 use random;
 
+// TODO : doc
+
 function input() {
 
-    usage = "Usage : localsolver ls_solver.lsp outfile=<your output file name>";
+    usage = "Usage : localsolver ls_solver.lsp <init_solution or 'nil'> <desired output file path> <week number (1 or 2)>";
     if (outfile == nil) throw usage;
+    if (week == nil) throw usage;
 
-    // TODO : ignore centres & max palette capa as argument
-    // ignore_centres = {2, 12, 7, 14, 21, 10, 3, 11}; // ALL SEMI HEBDO
-    // ignore_centres = {2, 12, 7, 14, 21}; // WEEK 1 + FREE
-    // ignore_centres = {2, 12, 10, 3, 11}; // WEEK 2 + FREE
-    ignore_centres = {7, 14, 21}; // WEEK 1
-    // ignore_centres = {10, 3, 11}; // WEEK 2
-    // ignore_centres = {11}; // FRONTON
-    // ignore_centres = {}; // NONE
+    week = 2 ;
     max_palette_capacity = 800 ;
     
     centres = csv.parse("data/centres.csv");
@@ -44,10 +40,13 @@ function input() {
         demands["s"][i] = ceil(centres.rows[i+1][6] * 1.15); // Add 15% for robustness
     }
 
-    for [i in ignore_centres] {
-        demands["a"][i-1] = 0;
-        demands["f"][i-1] = 0;
-        demands["s"][i-1] = 0;
+    for [i in 0...n] {
+        semaine_livraison = centres.rows[i+1][7] ;
+        if(semaine_livraison != 0 && semaine_livraison != week) {
+            demands["a"][i] = 0;
+            demands["f"][i] = 0;
+            demands["s"][i] = 0;
+        };
     }
 
     for [i in 0...m] {
@@ -57,8 +56,20 @@ function input() {
         frais[i] = row[4];
     }
 
+    jours_map = {"Lundi": 0, "Mardi": 1, "Mercredi": 2, "Jeudi": 3, "Vendredi": 4};
+    use_pl = {};
     for [i in 0...n_pdr] {
-        freqs_pdr[i] = pdr.rows[i][4];
+        jours = pdr.rows[i][3 + week].split(", ") ;
+        j_de_ramasse[i] = {};
+        for [k in 0...jours.count()] {
+            
+            if (jours[k].indexOf("(PL") != -1) {
+                jours[k] = jours[k].replace("(PL)", "") ;
+                use_pl[jours_map[jours[k]]] = i;
+            }
+
+            j_de_ramasse[i].add(jours_map[jours[k]]);
+        }
     }
 }
 
@@ -195,6 +206,7 @@ function model() {
                 c => load[d][v][c]
             ) <= capacities[v] ;
 
+            constraint sum[c in 0...n](palettes[d][v][c]) <= sizes[v] ;
 
             n_livraisons[d][v] <- count(livraisons[d][v]) ;
             n_ramasses[d][v] <- count(ramasses[d][v]) ;
@@ -234,19 +246,21 @@ function model() {
 
     for [pdr in 0...n_pdr] {
         // Visit points de ramasse enough times each week
-        constraint sum(
-            0...n_days,
-            d => sum(
-                0...m,
-                v => visits_r[d][v][pdr]
-            )
-        ) >= freqs_pdr[pdr] ;
-
-        // Don't visit the same one twice a day
         for [d in 0...n_days] {
-            constraint sum(0...m,
-                v => visits_r[d][v][pdr]
-            ) <= 1 ;
+
+            n_ramasses = 0 ;
+            for [j in j_de_ramasse[pdr]] {
+                if (j==d) {
+                    n_ramasses += 1 ;
+                }
+            }
+
+            if (use_pl[d] == pdr) {
+                n_ramasses -= 1 ;
+                constraint visits_r[d][0][pdr] ;
+            }
+
+            constraint sum[v in 1...m : frais[v] == "Oui"](visits_r[d][v][pdr]) == n_ramasses ; 
         }
     }
 
@@ -286,7 +300,6 @@ function model() {
 }
 
 function param() {
-    set_initial_solution(false, nil);
 
     // lsVerbosity = 1;
     // lsTimeLimit = 120;
@@ -381,8 +394,10 @@ function callback(ls, cbType) {
 }
 
 function main(args) {
-    outfile=args[0];
-    initfile=args[1];
+
+    initfile=args[0] == "nil" ? nil : args[0];
+    outfile=args[1];
+    week=args[2];
 
     lastBestValue = inf - 1 ;
     lastBestRunningTime = 0;
@@ -396,7 +411,12 @@ function main(args) {
         model();
 
         ls.model.close();
+
+        if (initfile != nil) {
+            set_initial_solution(false, nil);
+        }
         param();
+
         ls.solve();
     }
     output();
