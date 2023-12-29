@@ -141,12 +141,12 @@ def add_hints(
     print("\r")
 
 
-def prune_arcs(n_nodes, matrix, limit=0.7):  #:limit=0.28):
+def prune_arcs(n_nodes, matrix, limit=1):  #:limit=0.28):
     max_dist = matrix.max().max()
     pruned = []
     for node1 in range(n_nodes):
         for node2 in range(n_nodes):
-            if matrix.iloc[node1, node2] >= limit * max_dist:
+            if matrix.iloc[node1, node2] > limit * max_dist:
                 pruned.append((node1, node2))
     return pruned
 
@@ -430,7 +430,7 @@ def solve_vrp(
 
     solver = cp_model.CpSolver()
 
-    # solver.parameters.num_workers = 12
+    solver.parameters.num_workers = 16
     # solver.parameters.max_time_in_seconds = 180
     # solver.parameters.min_num_lns_workers = 8
 

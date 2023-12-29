@@ -1,0 +1,145 @@
+{
+    "total_distance": 1521859,
+    "tours": {
+        "0, 1": [
+            { "index": 16, "name": "Muret", "type": "livraison", "delivery": [275, 0, 78], "palettes": 1 },
+            {
+                "index": 24,
+                "name": "Toulouse/Grande-Bretagne(Casselardit)",
+                "type": "livraison",
+                "delivery": [694, 0, 175],
+                "palettes": 1
+            }
+        ],
+        "0, 2": [
+            { "index": 17, "name": "Pibrac", "type": "livraison", "delivery": [0, 450, 0], "palettes": 1 },
+            { "index": 16, "name": "Muret", "type": "livraison", "delivery": [16, 434, 0], "palettes": 1 }
+        ],
+        "0, 7": [
+            { "index": 25, "name": "Toulouse/Malepere", "type": "livraison", "delivery": [0, 64, 0], "palettes": 1 },
+            { "index": 8, "name": "Escalquens", "type": "livraison", "delivery": [0, 801, 0], "palettes": 2 },
+            { "index": 31, "name": "Leclerc St Orens", "type": "ramasse" },
+            { "index": 32, "name": "Super U Flourens", "type": "ramasse" },
+            { "index": 34, "name": "Leclerc Rouffiac", "type": "ramasse" }
+        ],
+        "0, 8": [
+            { "index": 17, "name": "Pibrac", "type": "livraison", "delivery": [0, 571, 0], "palettes": 1 },
+            { "index": 4, "name": "Blagnac", "type": "livraison", "delivery": [329, 0, 0], "palettes": 1 },
+            { "index": 33, "name": "Leclerc Blagnac", "type": "ramasse" },
+            { "index": 29, "name": "METRO", "type": "ramasse" }
+        ],
+        "0, 10": [
+            { "index": 5, "name": "Carbonne", "type": "livraison", "delivery": [351, 0, 0], "palettes": 1 },
+            {
+                "index": 26,
+                "name": "Toulouse/Negogousses(Les Arenes)",
+                "type": "livraison",
+                "delivery": [849, 0, 0],
+                "palettes": 2
+            }
+        ],
+        "1, 5": [
+            { "index": 14, "name": "Levignac", "type": "livraison", "delivery": [170, 201, 32], "palettes": 1 },
+            { "index": 13, "name": "Leguevin", "type": "livraison", "delivery": [196, 121, 33], "palettes": 1 }
+        ],
+        "1, 7": [
+            { "index": 9, "name": "Fenouillet", "type": "livraison", "delivery": [118, 189, 30], "palettes": 1 },
+            { "index": 29, "name": "METRO", "type": "ramasse" }
+        ],
+        "1, 8": [
+            { "index": 28, "name": "Villefranche de Lauragais", "type": "livraison", "delivery": [0, 83, 34], "palettes": 1 },
+            { "index": 20, "name": "Revel", "type": "livraison", "delivery": [286, 280, 73], "palettes": 1 },
+            { "index": 32, "name": "Super U Flourens", "type": "ramasse" },
+            { "index": 31, "name": "Leclerc St Orens", "type": "ramasse" },
+            { "index": 34, "name": "Leclerc Rouffiac", "type": "ramasse" }
+        ],
+        "2, 0": [
+            { "index": 25, "name": "Toulouse/Malepere", "type": "livraison", "delivery": [4933, 0, 198], "palettes": 7 },
+            { "index": 8, "name": "Escalquens", "type": "livraison", "delivery": [1137, 0, 109], "palettes": 2 },
+            {
+                "index": 26,
+                "name": "Toulouse/Negogousses(Les Arenes)",
+                "type": "livraison",
+                "delivery": [1289, 0, 365],
+                "palettes": 2
+            },
+            { "index": 27, "name": "Tournefeuille", "type": "livraison", "delivery": [681, 0, 30], "palettes": 1 },
+            { "index": 35, "name": "Carrefour Supply Chain", "type": "ramasse" }
+        ],
+        "2, 1": [
+            { "index": 17, "name": "Pibrac", "type": "livraison", "delivery": [1623, 0, 314], "palettes": 3 },
+            { "index": 7, "name": "Cugnaux", "type": "livraison", "delivery": [644, 0, 99], "palettes": 1 },
+            { "index": 19, "name": "Portet sur Garonne", "type": "livraison", "delivery": [731, 0, 103], "palettes": 1 }
+        ],
+        "2, 2": [
+            { "index": 23, "name": "Salies du Salat/Mane", "type": "livraison", "delivery": [328, 298, 64], "palettes": 1 },
+            { "index": 22, "name": "Saint-Gaudens", "type": "livraison", "delivery": [57, 153, 0], "palettes": 1 },
+            { "index": 29, "name": "METRO", "type": "ramasse" }
+        ],
+        "2, 3": [
+            { "index": 5, "name": "Carbonne", "type": "livraison", "delivery": [0, 145, 27], "palettes": 1 },
+            { "index": 6, "name": "Cazeres", "type": "livraison", "delivery": [160, 115, 13], "palettes": 1 },
+            { "index": 1, "name": "Auterive", "type": "livraison", "delivery": [133, 103, 0], "palettes": 1 },
+            { "index": 28, "name": "Villefranche de Lauragais", "type": "livraison", "delivery": [91, 113, 0], "palettes": 1 },
+            { "index": 31, "name": "Leclerc St Orens", "type": "ramasse" },
+            { "index": 32, "name": "Super U Flourens", "type": "ramasse" },
+            { "index": 30, "name": "Auchan Gramont", "type": "ramasse" },
+            { "index": 34, "name": "Leclerc Rouffiac", "type": "ramasse" }
+        ],
+        "2, 5": [
+            { "index": 7, "name": "Cugnaux", "type": "livraison", "delivery": [65, 452, 0], "palettes": 1 },
+            { "index": 18, "name": "Plaisance du Touch", "type": "livraison", "delivery": [252, 99, 32], "palettes": 1 },
+            { "index": 35, "name": "Carrefour Supply Chain", "type": "ramasse" }
+        ],
+        "2, 6": [
+            { "index": 19, "name": "Portet sur Garonne", "type": "livraison", "delivery": [0, 274, 0], "palettes": 1 },
+            {
+                "index": 26,
+                "name": "Toulouse/Negogousses(Les Arenes)",
+                "type": "livraison",
+                "delivery": [0, 624, 0],
+                "palettes": 2
+            }
+        ],
+        "2, 8": [
+            { "index": 27, "name": "Tournefeuille", "type": "livraison", "delivery": [0, 406, 0], "palettes": 1 },
+            {
+                "index": 26,
+                "name": "Toulouse/Negogousses(Les Arenes)",
+                "type": "livraison",
+                "delivery": [0, 494, 0],
+                "palettes": 2
+            }
+        ],
+        "3, 7": [
+            { "index": 4, "name": "Blagnac", "type": "livraison", "delivery": [372, 429, 99], "palettes": 2 },
+            { "index": 33, "name": "Leclerc Blagnac", "type": "ramasse" },
+            { "index": 29, "name": "METRO", "type": "ramasse" }
+        ],
+        "3, 8": [
+            { "index": 25, "name": "Toulouse/Malepere", "type": "livraison", "delivery": [0, 900, 0], "palettes": 2 },
+            { "index": 31, "name": "Leclerc St Orens", "type": "ramasse" },
+            { "index": 32, "name": "Super U Flourens", "type": "ramasse" }
+        ],
+        "4, 3": [
+            {
+                "index": 24,
+                "name": "Toulouse/Grande-Bretagne(Casselardit)",
+                "type": "livraison",
+                "delivery": [11, 889, 0],
+                "palettes": 2
+            },
+            { "index": 33, "name": "Leclerc Blagnac", "type": "ramasse" },
+            { "index": 29, "name": "METRO", "type": "ramasse" }
+        ],
+        "4, 7": [
+            { "index": 15, "name": "Montrejeau", "type": "livraison", "delivery": [98, 106, 7], "palettes": 1 },
+            { "index": 22, "name": "Saint-Gaudens", "type": "livraison", "delivery": [410, 222, 0], "palettes": 1 },
+            { "index": 35, "name": "Carrefour Supply Chain", "type": "ramasse" },
+            { "index": 31, "name": "Leclerc St Orens", "type": "ramasse" },
+            { "index": 32, "name": "Super U Flourens", "type": "ramasse" },
+            { "index": 30, "name": "Auchan Gramont", "type": "ramasse" },
+            { "index": 34, "name": "Leclerc Rouffiac", "type": "ramasse" }
+        ]
+    }
+}

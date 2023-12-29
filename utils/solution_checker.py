@@ -1,7 +1,7 @@
 import pandas as pd
 import json
 import sys
-from ..utils.problem import Problem, read_problem
+from problem import Problem, read_problem
 
 
 def check_solution_file(

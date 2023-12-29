@@ -12,7 +12,6 @@ function input() {
     if (outfile == nil) throw usage;
     if (week == nil) throw usage;
 
-    week = 2 ;
     max_palette_capacity = 800 ;
     
     centres = csv.parse("data/centres.csv");
@@ -139,11 +138,26 @@ function set_initial_solution(force, specific_vd) {
                     } else {
                         livraisons[d][v].value.add(index);
                         palettes[d][v][index].value = place["palettes"];
-                        serve_a[d][v][index].value = place["delivery"][0];
-                        if (frais[v] == "Oui") {
-                            serve_f[d][v][index].value = place["delivery"][1];
+
+                        if (place["delivery"][0] > demands["a"][index]) {
+                            serve_a[d][v][index].value = 0;
+                        } else {
+                            serve_a[d][v][index].value = place["delivery"][0];
                         }
-                        serve_s[d][v][index].value = place["delivery"][2];
+
+                        if (frais[v] == "Oui") {
+                            if (place["delivery"][1] > demands["f"][index]) {
+                                serve_f[d][v][index].value = 0;
+                            } else {
+                                serve_f[d][v][index].value = place["delivery"][1];
+                            }
+                        }
+
+                        if (place["delivery"][2] > demands["s"][index]) {
+                            serve_s[d][v][index].value = 0;
+                        } else {
+                            serve_s[d][v][index].value = place["delivery"][2];
+                        }
                     }
 
                 } else {
@@ -226,8 +240,7 @@ function model() {
         }
     }
 
-    // set_initial_solution(true);
-    // fix(0.8);
+
 
     // Symmetry breaking
     // for [d in 0...n_days-1] {
@@ -397,7 +410,7 @@ function main(args) {
 
     initfile=args[0] == "nil" ? nil : args[0];
     outfile=args[1];
-    week=args[2];
+    week=args[2].toInt();
 
     lastBestValue = inf - 1 ;
     lastBestRunningTime = 0;
@@ -409,6 +422,9 @@ function main(args) {
         ls.addCallback("ITERATION_TICKED", callback);
 
         model();
+
+        // set_initial_solution(true);
+        // fix(0.5);
 
         ls.model.close();
 
