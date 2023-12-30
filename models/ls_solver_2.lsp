@@ -72,19 +72,6 @@ function input() {
     }
 }
 
-function fix(percentage) {
-    vd_to_fix = {};
-    n_fix = round(percentage * n_days * m);
-
-    vd = 0 ;
-    randgen = random.create();
-    while (vd_to_fix.count() < n_fix) {
-        vd_to_fix.add(randgen.next(0, n_days * m)) ;
-    }
-
-    set_initial_solution(true, vd_to_fix);
-
-}
 
 function set_initial_solution(force, specific_vd) {
 
@@ -114,29 +101,26 @@ function set_initial_solution(force, specific_vd) {
             if (tours_init[key] == nil) 
                 continue;
 
-            livraison_init = {};
-            ramasse_init = {};
+            tour_init = {};
             if (!force) {
-                livraisons[d][v].value.clear();
-                ramasses[d][v].value.clear();
+                tour[d][v].value.clear();
             }
             i = 0;
-            j = 0 ;
             for [place in tours_init[key]] {
                 if (place["type"] == "livraison") {
                     index = place["index"] - 1;
 
-                    livraison_init.add(index);
+                    tour_init.add(index);
                     if (force) {
-                        constraint livraisons[d][v][i] == index;
-                        constraint visits_l[d][v][index] == 1 ;
+                        constraint tour[d][v][i] == index;
+                        constraint visits[d][v][index] == 1 ;
                         i += 1 ;
                         constraint palettes[d][v][index] == place["palettes"];
                         constraint serve_a[d][v][index] >= place["delivery"][0] ;
                         constraint serve_f[d][v][index] >= place["delivery"][1] ;
                         constraint serve_s[d][v][index] >= place["delivery"][2] ;
                     } else {
-                        livraisons[d][v].value.add(index);
+                        tour[d][v].value.add(index);
                         palettes[d][v][index].value = place["palettes"];
 
                         if (place["delivery"][0] > demands["a"][index]) {
@@ -161,18 +145,17 @@ function set_initial_solution(force, specific_vd) {
                     }
 
                 } else {
-                    ramasse_init.add(place["index"] - n - 1);
+                    tour_init.add(place["index"] - 1);
                     if (force){
-                        constraint ramasses[d][v][j] == place["index"]-1-n;
-                        j += 1;
+                        constraint tour[d][v][i] == place["index"]-1;
+                        i += 1;
                     } else {
-                        ramasses[d][v].value.add(place["index"] - n - 1);
+                        tour[d][v].value.add(place["index"] - 1);
                     }
                 }
             }
             if (force) {
-                constraint count(livraisons[d][v]) == livraison_init.count();
-                constraint count(ramasses[d][v]) == ramasse_init.count();
+                constraint count(tour[d][v]) == tour_init.count();
             }
         }
     }
@@ -184,72 +167,74 @@ function model() {
     for [d in 0...n_days] {
         for [v in 0...m] {
 
-            livraisons[d][v] <- list(n);
-            ramasses[d][v] <- list(n_pdr);
+            tour[d][v] <- list(n_nodes);
 
-            for [c in 0...n] {
-                visits_l[d][v][c] <- contains(livraisons[d][v], c) ;
+            for [node in 0...n_nodes] {
+                visits[d][v][node] <- contains(tour[d][v], node) ;
+                id[d][v][node] <- indexOf(tour[d][v], node);
             }
-            for [p in 0...n_pdr] {
-                visits_r[d][v][p] <- contains(ramasses[d][v], p);
+
+            for [pdr in n...n_nodes] {
+                for [c in 0...n] {
+                    constraint or(
+                            !visits[d][v][c], 
+                            !visits[d][v][pdr], 
+                            id[d][v][pdr] >= id[d][v][c]
+                        ) ;
+                }
             }
+
             
             for [c in 0...n] {
                 serve_a[d][v][c] <- int(0, demands["a"][c]) ;
                 serve_f[d][v][c] <- frais[v] == "Oui" ? int(0, demands["f"][c]) : 0 ;
-                // serve_f[d][v][c] <- int(0, demands["f"][c]);
                 serve_s[d][v][c] <- int(0, demands["s"][c]) ;
 
                 load[d][v][c] <- serve_a[d][v][c] + serve_f[d][v][c] + serve_s[d][v][c] ;
 
-                constraint visits_l[d][v][c] * demands["a"][c] >= serve_a[d][v][c] ;
-                constraint visits_l[d][v][c] * demands["f"][c] >= serve_f[d][v][c] ;
-                constraint visits_l[d][v][c] * demands["s"][c] >= serve_s[d][v][c] ;
+                constraint visits[d][v][c] * demands["a"][c] >= serve_a[d][v][c] ;
+                constraint visits[d][v][c] * demands["f"][c] >= serve_f[d][v][c] ;
+                constraint visits[d][v][c] * demands["s"][c] >= serve_s[d][v][c] ;
 
                 palettes[d][v][c] <- int(0, sizes[v]);
                 constraint palettes[d][v][c] * max_palette_capacity >= serve_a[d][v][c] + serve_f[d][v][c];
             } 
 
-            constraint sum[c in 0...n](load[d][v][c]) <= capacities[v] ;
+            constraint sum(
+                0...n,
+                c => load[d][v][c]
+            ) <= capacities[v] ;
+
             constraint sum[c in 0...n](palettes[d][v][c]) <= sizes[v] ;
 
-            n_livraisons[d][v] <- count(livraisons[d][v]) ;
-            n_ramasses[d][v] <- count(ramasses[d][v]) ;
-
-            local liv <- n_livraisons[d][v] > 0 ;
-            local ram <- n_ramasses[d][v] > 0 ;
+            n_stops[d][v] <- count(tour[d][v]) ;
 
             route_dist[d][v] <- 
-                + (liv ? dist_from_depot[livraisons[d][v][0]] 
-                        + sum(1...n_livraisons[d][v], i => dist_matrix[livraisons[d][v][i - 1]][livraisons[d][v][i]]) 
-                        
-                        + (ram ? 
-                            dist_matrix[livraisons[d][v][n_livraisons[d][v]-1]][ramasses[d][v][0] + n]
-                            : dist_to_depot[livraisons[d][v][n_livraisons[d][v]-1]])
-
-                        : (ram ? dist_from_depot[ramasses[d][v][0] + n] : 0)) 
-                + (ram ? dist_to_depot[ramasses[d][v][n_ramasses[d][v]-1] + n] : 0) 
-                        + sum(1...n_ramasses[d][v], i => dist_matrix[ramasses[d][v][i - 1] + n][ramasses[d][v][i] + n])
+                (n_stops[d][v] > 0) ?
+                sum(1...n_stops[d][v], i => 
+                    dist_matrix[tour[d][v][i - 1]][tour[d][v][i]])
+                    + dist_from_depot[tour[d][v][0]]
+                    + dist_to_depot[tour[d][v][n_stops[d][v] - 1]] : 0
+                
                 ;
         }
     }
 
-
-
-    // Symmetry breaking
+    // // Symmetry breaking
     // for [d in 0...n_days-1] {
     //     for [v in 0...m] {
-    //         constraint n_livraisons[d][v] >= n_livraisons[d+1][v] ; 
+    //         constraint n_stops[d][v] >= n_stops[d+1][v] ; 
     //     }
     // }
     // for [d in 0...n_days] {
     //     for [v in 2...9-1] {
-    //         constraint n_livraisons[d][v] >= n_livraisons[d][v+1] ;
+    //         constraint n_stops[d][v] >= n_stops[d][v+1] ;
     //     }
     //     for [v in 10...m-1] {
-    //         constraint n_livraisons[d][v] >= n_livraisons[d][v+1] ;
+    //         constraint n_stops[d][v] >= n_stops[d][v+1] ;
     //     }
     // }
+
 
     for [pdr in 0...n_pdr] {
         // Visit points de ramasse enough times each week
@@ -264,24 +249,47 @@ function model() {
 
             if (use_pl[d] == pdr) {
                 n_ramasses -= 1 ;
-                constraint visits_r[d][0][pdr] ;
+                constraint visits[d][0][n + pdr] ;
             }
 
-            constraint sum[v in 1...m : frais[v] == "Oui"](visits_r[d][v][pdr]) == n_ramasses ; 
+            constraint sum[v in 1...m : frais[v] == "Oui"](visits[d][v][n + pdr]) == n_ramasses ; 
         }
     }
 
-    // constraint cover[d in 0...n_days][v in 0...m](livraisons[d][v]);
-    // constraint cover[d in 0...n_days][v in 0...m](ramasses[d][v]);
+    // constraint cover[d in 0...n_days][v in 0...m](tour[d][v]);
+
 
     // Meet demands
     for [c in 0...n] {
-        constraint sum[d in 0...n_days][v in 0...m](serve_a[d][v][c]) >= demands["a"][c];
-        constraint sum[d in 0...n_days][v in 0...m](serve_f[d][v][c]) >= demands["f"][c];
-        constraint sum[d in 0...n_days][v in 0...m](serve_s[d][v][c]) >= demands["s"][c];
+        constraint sum(
+            0...n_days,
+            d => sum(
+                0...m,
+                v => serve_a[d][v][c]
+            )
+        ) >= demands["a"][c];
+
+        constraint sum(
+            0...n_days,
+            d => sum(
+                0...m,
+                v => serve_f[d][v][c]
+            )
+        ) >= demands["f"][c];
+
+        constraint sum(
+            0...n_days,
+            d => sum(
+                0...m,
+                v => serve_s[d][v][c]
+            )
+        ) >= demands["s"][c];
     }
 
-    total_distance <- sum[d in 0...n_days][v in 0...m](route_dist[d][v]);
+    total_distance <- sum
+        [d in 0...n_days](
+        sum[v in 0...m](route_dist[d][v])
+    );
 
     minimize total_distance;
 }
@@ -294,6 +302,7 @@ function param() {
     // lsSeed = 1 ;
 }
 
+
 function write_solution() {
     if (outfile == nil) return;
     local outf = io.openWrite(outfile);
@@ -304,38 +313,29 @@ function write_solution() {
 
     for [d in 0...n_days] {
         for [v in 0...m] {
-            if (livraisons[d][v].value.count() == 0 && ramasses[d][v].value.count() == 0) continue;
+            if (tour[d][v].value.count() == 0) continue;
 
             key = d + ", " + v ;
             sol["tours"][key] = {};
 
-            for [node in livraisons[d][v].value] {
+            for [node in tour[d][v].value] {
                 place = {};
-
                 place["index"] = node+1;
-                place["type"] = "livraison";
-
                 name = matrix.rows[node + 1][0];
                 place["name"] = name;
 
-                delivery = {serve_a[d][v][node].value, serve_f[d][v][node].value, serve_s[d][v][node].value};
-                place["delivery"] = delivery;
+                if (node < n) {
+                    place["type"] = "livraison";
 
-                pals = palettes[d][v][node].value;
-                place["palettes"] = pals;
+                    delivery = {serve_a[d][v][node].value, serve_f[d][v][node].value, serve_s[d][v][node].value};
+                    place["delivery"] = delivery;
 
-                sol["tours"][key].add(place);
-            }
+                    pals = palettes[d][v][node].value;
+                    place["palettes"] = pals;
+                } else {
+                    place["type"] = "ramasse";
 
-            for [node in ramasses[d][v].value] {
-                place = {};
-
-                place["index"] = node+1+n;
-                place["type"] = "ramasse";
-
-                name = matrix.rows[node + 1 + n][0];
-                place["name"] = name;
-
+                }
                 sol["tours"][key].add(place);
             }
         }
@@ -350,14 +350,15 @@ function output(){
     for [d in 0...n_days] {
         println("DAY ", d);
         for [v in 0...m] {
-            if (count(livraisons[d][v].value) == 0 && count(ramasses[d][v].value) == 0) continue;
+            if (count(tour[d][v].value) == 0) continue;
             println("\tVehicle ", v, " (", vehicles.rows[v][0], ")");
-            for [node in livraisons[d][v].value] {
-                pal = palettes[d][v][node].value ;
-                println("\t\t", pal, " Palettes to ", matrix.rows[node + 1][0]);
-            }
-            for [node in ramasses[d][v].value] {
-                println("\t\t Ramasse at ", matrix.rows[node + 1][0]);
+            for [node in tour[d][v].value] {
+                if (node < n) {
+                    pal = palettes[d][v][node].value ;
+                    println("\t\t", pal, " Palettes to ", matrix.rows[node + 1][0]);
+                } else {
+                    println("\t\t Ramasse at ", matrix.rows[node + 1][0]);
+                }
             }
             println();
         }
