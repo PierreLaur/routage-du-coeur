@@ -19,33 +19,43 @@ function input() {
     matrix = csv.parse("data/euclidean_matrix.csv");
     vehicles = csv.parse("data/vehicules.csv");
 
-    n = centres.nbRows - 1;
+    n_centres = centres.nbRows ;
+
+    // Drop some unused centres (delivered the other week)
+    index_to_centre = {} ;
+    i = 0 ;
+    for [c in 0...n_centres - 1] {
+        semaine_livraison = centres.rows[c+1][7] ;
+        if(semaine_livraison == 0 || semaine_livraison == week) {
+            index_to_centre[i] = c ;
+            i += 1 ;
+        };
+    }
+
+    n = index_to_centre.count();
     m = vehicles.nbRows;
     n_pdr = pdr.nbRows;
     n_nodes = n + n_pdr;
     n_days = 5 ;
 
     for [node in 0...n_nodes] {
-        dist_from_depot[node] = matrix.rows[0][node+2] ;
-        dist_to_depot[node] = matrix.rows[node+1][1] ;
+        node_index = node < n ? index_to_centre[node] : node - n + n_centres - 1 ;
+
+        dist_from_depot[node] = matrix.rows[0][node_index+2] ;
+        dist_to_depot[node] = matrix.rows[node_index+1][1] ;
+
         for [node2 in 0...n_nodes] {
-            dist_matrix[node][node2] = matrix.rows[node+1][node2+2];
+            node_index2 = node2 < n ? index_to_centre[node2] : node2 - n + n_centres - 1 ;
+            
+            dist_matrix[node][node2] = matrix.rows[node_index+1][node_index2+2];
         }
     }
 
     for [i in 0...n] {
-        demands["a"][i] = ceil(centres.rows[i+1][4] * 1.15); // Add 15% for robustness
-        demands["f"][i] = ceil(centres.rows[i+1][5] * 1.15); // Add 15% for robustness
-        demands["s"][i] = ceil(centres.rows[i+1][6] * 1.15); // Add 15% for robustness
-    }
-
-    for [i in 0...n] {
-        semaine_livraison = centres.rows[i+1][7] ;
-        if(semaine_livraison != 0 && semaine_livraison != week) {
-            demands["a"][i] = 0;
-            demands["f"][i] = 0;
-            demands["s"][i] = 0;
-        };
+        centre = index_to_centre[i] ;
+        demands["a"][i] = ceil(centres.rows[centre+1][4] * 1.15); // Add 15% for robustness
+        demands["f"][i] = ceil(centres.rows[centre+1][5] * 1.15); // Add 15% for robustness
+        demands["s"][i] = ceil(centres.rows[centre+1][6] * 1.15); // Add 15% for robustness
     }
 
     for [i in 0...m] {
@@ -53,6 +63,7 @@ function input() {
         capacities[i] = row[1];
         sizes[i] = row[2];
         frais[i] = row[4];
+        // frais[i] = "Oui";
     }
 
     jours_map = {"Lundi": 0, "Mardi": 1, "Mercredi": 2, "Jeudi": 3, "Vendredi": 4};
@@ -100,7 +111,6 @@ function set_initial_solution(force, specific_vd) {
 
     tours_init = json.parse(initfile)["tours"];
 
-
     for [d in 0...n_days] {
         for [v in 0...m] {
 
@@ -124,7 +134,18 @@ function set_initial_solution(force, specific_vd) {
             j = 0 ;
             for [place in tours_init[key]] {
                 if (place["type"] == "livraison") {
-                    index = place["index"] - 1;
+                    index = - 1 ;
+                    for [c in 0...n] {
+                        if (index_to_centre[c] == place["index"] - 1) {
+                            index = c ;
+                            break ;
+                        } else {
+                        }
+                    }
+                    if (index == -1) {
+                        println("Warning : skipping ", place["name"], " ", place["index"], " in input solution") ;
+                        break ;
+                    }
 
                     livraison_init.add(index);
                     if (force) {
@@ -161,12 +182,12 @@ function set_initial_solution(force, specific_vd) {
                     }
 
                 } else {
-                    ramasse_init.add(place["index"] - n - 1);
+                    ramasse_init.add(place["index"] - n_centres);
                     if (force){
-                        constraint ramasses[d][v][j] == place["index"]-1-n;
+                        constraint ramasses[d][v][j] == place["index"] - n_centres;
                         j += 1;
                     } else {
-                        ramasses[d][v].value.add(place["index"] - n - 1);
+                        ramasses[d][v].value.add(place["index"] - n_centres);
                     }
                 }
             }
@@ -181,43 +202,35 @@ function set_initial_solution(force, specific_vd) {
 
 function model() {
 
+    livraisons[d in 0...n_days][v in 0...m] <- list(n);
+    ramasses[d in 0...n_days][v in 0...m] <- list(n_pdr);
+
+    serve_a[d in 0...n_days][v in 0...m][c in 0...n] <- int(0, demands["a"][c]) ;
+    serve_f[d in 0...n_days][v in 0...m][c in 0...n] <- frais[v] == "Oui" ? int(0, demands["f"][c]) : 0 ;
+    serve_s[d in 0...n_days][v in 0...m][c in 0...n] <- int(0, demands["s"][c]) ;
+
+    constraint cover[d in 0...n_days][v in 0...m](livraisons[d][v]);
+    constraint cover[d in 0...n_days][v in 0...m](ramasses[d][v]);
+
     for [d in 0...n_days] {
         for [v in 0...m] {
-
-            livraisons[d][v] <- list(n);
-            ramasses[d][v] <- list(n_pdr);
-
-            for [c in 0...n] {
-                visits_l[d][v][c] <- contains(livraisons[d][v], c) ;
-            }
-            for [p in 0...n_pdr] {
-                visits_r[d][v][p] <- contains(ramasses[d][v], p);
-            }
-            
-            for [c in 0...n] {
-                serve_a[d][v][c] <- int(0, demands["a"][c]) ;
-                serve_f[d][v][c] <- frais[v] == "Oui" ? int(0, demands["f"][c]) : 0 ;
-                // serve_f[d][v][c] <- int(0, demands["f"][c]);
-                serve_s[d][v][c] <- int(0, demands["s"][c]) ;
-
-                load[d][v][c] <- serve_a[d][v][c] + serve_f[d][v][c] + serve_s[d][v][c] ;
-
-                constraint visits_l[d][v][c] * demands["a"][c] >= serve_a[d][v][c] ;
-                constraint visits_l[d][v][c] * demands["f"][c] >= serve_f[d][v][c] ;
-                constraint visits_l[d][v][c] * demands["s"][c] >= serve_s[d][v][c] ;
-
-                palettes[d][v][c] <- int(0, sizes[v]);
-                constraint palettes[d][v][c] * max_palette_capacity >= serve_a[d][v][c] + serve_f[d][v][c];
-            } 
-
-            constraint sum[c in 0...n](load[d][v][c]) <= capacities[v] ;
-            constraint sum[c in 0...n](palettes[d][v][c]) <= sizes[v] ;
 
             n_livraisons[d][v] <- count(livraisons[d][v]) ;
             n_ramasses[d][v] <- count(ramasses[d][v]) ;
 
             local liv <- n_livraisons[d][v] > 0 ;
             local ram <- n_ramasses[d][v] > 0 ;
+
+            visits_l[d][v][c in 0...n] <- contains(livraisons[d][v], c) ;
+            visits_r[d][v][p in 0...n_pdr] <- contains(ramasses[d][v], p);
+            
+            for [c in 0...n] {
+                load[d][v][c] <- visits_l[d][v][c] * (serve_a[d][v][c] + serve_f[d][v][c] + serve_s[d][v][c]) ;
+                palettes[d][v][c] <- int(0, sizes[v]);
+                constraint palettes[d][v][c] * max_palette_capacity >= visits_l[d][v][c] * (serve_a[d][v][c] + serve_f[d][v][c]);
+            } 
+            constraint sum[c in 0...n](palettes[d][v][c]) <= sizes[v] ;
+            constraint sum[c in 0...n](load[d][v][c]) <= capacities[v] ;
 
             route_dist[d][v] <- 
                 + (liv ? dist_from_depot[livraisons[d][v][0]] 
@@ -233,23 +246,6 @@ function model() {
                 ;
         }
     }
-
-
-
-    // Symmetry breaking
-    // for [d in 0...n_days-1] {
-    //     for [v in 0...m] {
-    //         constraint n_livraisons[d][v] >= n_livraisons[d+1][v] ; 
-    //     }
-    // }
-    // for [d in 0...n_days] {
-    //     for [v in 2...9-1] {
-    //         constraint n_livraisons[d][v] >= n_livraisons[d][v+1] ;
-    //     }
-    //     for [v in 10...m-1] {
-    //         constraint n_livraisons[d][v] >= n_livraisons[d][v+1] ;
-    //     }
-    // }
 
     for [pdr in 0...n_pdr] {
         // Visit points de ramasse enough times each week
@@ -271,14 +267,13 @@ function model() {
         }
     }
 
-    // constraint cover[d in 0...n_days][v in 0...m](livraisons[d][v]);
-    // constraint cover[d in 0...n_days][v in 0...m](ramasses[d][v]);
+
 
     // Meet demands
     for [c in 0...n] {
-        constraint sum[d in 0...n_days][v in 0...m](serve_a[d][v][c]) >= demands["a"][c];
-        constraint sum[d in 0...n_days][v in 0...m](serve_f[d][v][c]) >= demands["f"][c];
-        constraint sum[d in 0...n_days][v in 0...m](serve_s[d][v][c]) >= demands["s"][c];
+        constraint sum[d in 0...n_days][v in 0...m](visits_l[d][v][c] * serve_a[d][v][c]) >= demands["a"][c];
+        constraint sum[d in 0...n_days][v in 0...m](visits_l[d][v][c] * serve_f[d][v][c]) >= demands["f"][c];
+        constraint sum[d in 0...n_days][v in 0...m](visits_l[d][v][c] * serve_s[d][v][c]) >= demands["s"][c];
     }
 
     total_distance <- sum[d in 0...n_days][v in 0...m](route_dist[d][v]);
@@ -311,11 +306,12 @@ function write_solution() {
 
             for [node in livraisons[d][v].value] {
                 place = {};
+                node_index = index_to_centre[node];
 
-                place["index"] = node+1;
+                place["index"] = node_index + 1 ;
                 place["type"] = "livraison";
 
-                name = matrix.rows[node + 1][0];
+                name = matrix.rows[node_index + 1][0];
                 place["name"] = name;
 
                 delivery = {serve_a[d][v][node].value, serve_f[d][v][node].value, serve_s[d][v][node].value};
@@ -330,10 +326,10 @@ function write_solution() {
             for [node in ramasses[d][v].value] {
                 place = {};
 
-                place["index"] = node+1+n;
+                place["index"] = node + n_centres;
                 place["type"] = "ramasse";
 
-                name = matrix.rows[node + 1 + n][0];
+                name = matrix.rows[node + n_centres][0];
                 place["name"] = name;
 
                 sol["tours"][key].add(place);
@@ -347,21 +343,6 @@ function output(){
 
     write_solution();
 
-    for [d in 0...n_days] {
-        println("DAY ", d);
-        for [v in 0...m] {
-            if (count(livraisons[d][v].value) == 0 && count(ramasses[d][v].value) == 0) continue;
-            println("\tVehicle ", v, " (", vehicles.rows[v][0], ")");
-            for [node in livraisons[d][v].value] {
-                pal = palettes[d][v][node].value ;
-                println("\t\t", pal, " Palettes to ", matrix.rows[node + 1][0]);
-            }
-            for [node in ramasses[d][v].value] {
-                println("\t\t Ramasse at ", matrix.rows[node + 1][0]);
-            }
-            println();
-        }
-    }
     println("\nTotal distance : ", total_distance.value/1000);
 }
 
@@ -398,7 +379,7 @@ function main(args) {
         model();
 
         // set_initial_solution(true);
-        // fix(0.5);
+        // fix(0.8);
 
         ls.model.close();
 

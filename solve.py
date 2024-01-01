@@ -1,8 +1,8 @@
 from utils.problem import Problem, read_problem
 from models.cp_solver import solve_vrp, solve_vrp_single_serve
 from models.routing_solver import route_vrp
-import json
 import argparse
+import subprocess
 
 
 def solve_with_routing(
@@ -31,11 +31,15 @@ if __name__ == "__main__":
     parser.add_argument("week", type=int, help="week number (1 or 2)")
     parser.add_argument("--infile", type=str, help="init solution")
     parser.add_argument("--outfile", type=str, help="desired output file path")
+    parser.add_argument(
+        "--solver", type=str, help="solver to use (hexaly/ortools)", default="hexaly"
+    )
 
     args = parser.parse_args()
 
     if not args.outfile:
-        print("Warning : No output file specified")
+        print("Please specify an output file")
+        exit()
 
     problem = read_problem(
         "data/centres.xlsx",
