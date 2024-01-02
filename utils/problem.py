@@ -23,6 +23,7 @@ class Problem:
 def read_problem(
     centres_file, points_de_ramasse_file, vehicles_file, matrix_file, week
 ):
+    """Reads the problem from the usual input files and returns a Problem object"""
     centres = pd.read_excel(centres_file, index_col=0)
     points_de_ramasse = pd.read_excel(points_de_ramasse_file, index_col=0)
     vehicles = pd.read_excel(vehicles_file, index_col=0)

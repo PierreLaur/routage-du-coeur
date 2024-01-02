@@ -1,4 +1,3 @@
-import pandas as pd
 import json
 import sys
 from problem import Problem, read_problem
@@ -12,6 +11,7 @@ def check_solution_file(
     week,
     solution_file,
 ):
+    """Checks whether a solution file satisfies all constraints"""
     sol = json.load(open(solution_file))
     total_distance = sol["total_distance"]
     tours = sol["tours"]

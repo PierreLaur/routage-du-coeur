@@ -64,6 +64,8 @@ def add_hints(
     hint_file,
     force=False,
 ):
+    """Adds an initial solution as a hint to the model. If force is True, add constraints to force the solution to be the same."""
+
     print("Adding hints...", end="")
 
     hint = json.load(open(hint_file))["tours"]
@@ -142,6 +144,7 @@ def add_hints(
 
 
 def prune_arcs(n_nodes, matrix, limit=1):  #:limit=0.28):
+    """Evaluates whether each arc is longer than a given ratio of the maximum distance between nodes in the matrix, and returns the list of arcs that should be pruned"""
     max_dist = matrix.max().max()
     pruned = []
     for node1 in range(n_nodes):
@@ -152,6 +155,8 @@ def prune_arcs(n_nodes, matrix, limit=1):  #:limit=0.28):
 
 
 def read_tours(pb, arcs, solver):
+    """Reads tours from the solver
+    Returns a dictionary of tours with keys (day, vehicle)"""
     tours = {}
     for d in range(pb.n_days):
         for v in range(pb.m):
@@ -188,6 +193,7 @@ def read_tours(pb, arcs, solver):
 
 
 def write_sol(pb, solver, obj, tours, delivers, palettes, outfile):
+    """Writes the solution in JSON format to the specified file"""
     sol = {"total_distance": obj}
     sol["tours"] = {}
     for (d, v), tour in tours.items():
@@ -215,7 +221,8 @@ def write_sol(pb, solver, obj, tours, delivers, palettes, outfile):
 
 
 def reoptimize_tours(pb, solver, tours, delivers, obj):
-    # Re-optimize tours
+    """Finds cities that are visited for no delivery and erases them from the tour
+    Returns the resulting tours and the objective"""
     for d in range(pb.n_days):
         for v in range(pb.m):
             if len(tours[d, v]) == 1:
@@ -251,6 +258,10 @@ def solve_vrp(
     hint=None,
     outfile=None,
 ):
+    """Creates a CP model and solves it with cp-sat.
+    When done, re-optimizes the solution and writes it in JSON format to the specified file
+    """
+
     print("Modeling...")
 
     model = cp_model.CpModel()
@@ -475,7 +486,7 @@ def solve_vrp_single_serve(
     pb,
     hint=None,
 ):
-    """A version with bool delivers variables (serve each type of product only in one time)"""
+    """A version with bool delivers variables (serve each type of product only in one time) (for testing)"""
     print("Modeling...")
 
     for c in range(pb.n):

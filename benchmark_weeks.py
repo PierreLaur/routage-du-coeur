@@ -6,6 +6,10 @@ from random import shuffle
 
 
 def bench_assignments():
+    """Centres that are delivered every other week must be assigned to either week 1 or week 2
+    This function generates all possible assignments of these centres, runs the solver for each one, and generates a
+    assignments.csv file with the results"""
+
     centres = pd.read_csv("data/centres_original.csv")
     semi_hebdo = list()
     for i in range(len(centres)):

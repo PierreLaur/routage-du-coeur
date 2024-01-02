@@ -7,6 +7,7 @@ from problem import Problem, read_problem
 
 
 def pretty_print_solution(file, week):
+    """Generates a pretty printed version of the solution and returns it as a string"""
     with open(file) as f:
         sol = json.load(f)
 
@@ -70,41 +71,41 @@ def plot_solution(file):
     coords_centres = pd.read_excel("data/centres.xlsx")
     coords_pdr = pd.read_excel("data/points_de_ramasse.xlsx")
 
-    lats = coords_centres["Latitude"].tolist() + coords_pdr["Latitude"].tolist()
-    longs = coords_centres["Longitude"].tolist() + coords_pdr["Longitude"].tolist()
-    colors = [
-        "red",
-        "blue",
-        "green",
-        "purple",
-        "orange",
-        "pink",
-        "cyan",
-        "brown",
-        "gray",
-        "olive",
-    ]
+    # lats = coords_centres["Latitude"].tolist() + coords_pdr["Latitude"].tolist()
+    # longs = coords_centres["Longitude"].tolist() + coords_pdr["Longitude"].tolist()
+    # colors = [
+    #     "red",
+    #     "blue",
+    #     "green",
+    #     "purple",
+    #     "orange",
+    #     "pink",
+    #     "cyan",
+    #     "brown",
+    #     "gray",
+    #     "olive",
+    # ]
 
-    fig = px.scatter(
-        y=lats,
-        x=longs,
-        text=coords_centres["Nom"].tolist() + coords_pdr["Nom"].tolist(),
-        title="Restos du Cœur",
-    )
+    # fig = px.scatter(
+    #     y=lats,
+    #     x=longs,
+    #     text=coords_centres["Nom"].tolist() + coords_pdr["Nom"].tolist(),
+    #     title="Restos du Cœur",
+    # )
 
-    for i, tour in enumerate(tours):
-        color = colors[i % len(colors)]
+    # for i, tour in enumerate(tours):
+    #     color = colors[i % len(colors)]
 
-        fig.add_traces(
-            go.Scatter(
-                y=[lats[t] for t in tour],
-                x=[longs[t] for t in tour],
-                mode="lines+markers",
-                line=dict(color=color),
-                name=f"Tour {i}",
-            )
-        )
-    fig.show()
+    #     fig.add_traces(
+    #         go.Scatter(
+    #             y=[lats[t] for t in tour],
+    #             x=[longs[t] for t in tour],
+    #             mode="lines+markers",
+    #             line=dict(color=color),
+    #             name=f"Tour {i}",
+    #         )
+    #     )
+    # fig.show()
 
 
 if __name__ == "__main__":

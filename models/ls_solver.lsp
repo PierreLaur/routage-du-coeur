@@ -4,8 +4,6 @@ use io;
 use localsolver;
 use random;
 
-// TODO : doc
-
 function input() {
 
     usage = "Usage : localsolver ls_solver.lsp <init_solution or 'nil'> <desired output file path> <week number (1 or 2)>";
@@ -22,6 +20,7 @@ function input() {
     n_centres = centres.nbRows ;
 
     // Drop some unused centres (delivered the other week)
+    // Create a map to be able to fetch info for centres in the datafiles
     index_to_centre = {} ;
     i = 0 ;
     for [c in 0...n_centres - 1] {
@@ -32,6 +31,7 @@ function input() {
         }
     }
 
+    // The number of centres to serve this week
     n = index_to_centre.count();
     m = vehicles.nbRows;
     n_pdr = pdr.nbRows;
@@ -51,25 +51,30 @@ function input() {
         }
     }
 
+    // Demands (Add 15% for robustness)
     for [i in 0...n] {
         centre = index_to_centre[i] ;
-        demands["a"][i] = ceil(centres.rows[centre+1][4] * 1.15); // Add 15% for robustness
+        demands["a"][i] = ceil(centres.rows[centre+1][4] * 1.15); 
         demands["f"][i] = ceil(centres.rows[centre+1][5] * 1.15); // Add 15% for robustness
         demands["s"][i] = ceil(centres.rows[centre+1][6] * 1.15); // Add 15% for robustness
     }
 
+    // Pickup weights (per pickup)
     for [p in 0...n_pdr] {
         weight[p] = ceil(pdr.rows[p][6] * 1.15);
     }
 
     for [i in 0...m] {
         row = vehicles.rows[i];
+        // Capacities in kg
         capacities[i] = row[1];
+        // Sizes in number of pallets
         sizes[i] = row[2];
         frais[i] = row[4];
         // frais[i] = "Oui";
     }
 
+    // When do we have to pickup each site ?
     jours_map = {"Lundi": 0, "Mardi": 1, "Mercredi": 2, "Jeudi": 3, "Vendredi": 4};
     use_pl = {};
     for [i in 0...n_pdr] {
@@ -77,6 +82,8 @@ function input() {
         j_de_ramasse[i] = {};
         for [k in 0...jours.count()] {
             
+            // PL can be written to specifically ask a pickup at p on day d with the PL
+            // in which case use_pl[d] = p
             if (jours[k].indexOf("(PL") != -1) {
                 jours[k] = jours[k].replace("(PL)", "") ;
                 use_pl[jours_map[jours[k]]] = i;
@@ -88,6 +95,7 @@ function input() {
 }
 
 function fix(percentage) {
+    // Fix some percentage of the tours to locally improve the solution (basic LNS procedure)
     vd_to_fix = {};
     n_fix = round(percentage * n_days * m);
 
@@ -98,10 +106,12 @@ function fix(percentage) {
     }
 
     set_initial_solution(true, vd_to_fix);
-
 }
 
 function set_initial_solution(force, specific_vd) {
+    /* Set an initial solution.
+    If force == true, add constraints instead to match the initial solution instead.
+    Only fix tours of vehicle-days in specific_vd */
 
     if (initfile == nil) return;
 
@@ -209,6 +219,7 @@ function model() {
     livraisons[d in 0...n_days][v in 0...m] <- list(n);
     ramasses[d in 0...n_days][v in 0...m] <- list(n_pdr);
 
+    // Deliver quantity for each product type (ambiant/frais/surgelé)
     serve_a[d in 0...n_days][v in 0...m][c in 0...n] <- int(0, demands["a"][c]) ;
     serve_f[d in 0...n_days][v in 0...m][c in 0...n] <- frais[v] == "Oui" ? int(0, demands["f"][c]) : 0 ;
     serve_s[d in 0...n_days][v in 0...m][c in 0...n] <- int(0, demands["s"][c]) ;
@@ -231,15 +242,22 @@ function model() {
             for [c in 0...n] {
                 load[d][v][c] <- visits_l[d][v][c] * (serve_a[d][v][c] + serve_f[d][v][c] + serve_s[d][v][c]) ;
                 palettes[d][v][c] <- int(0, sizes[v]);
+
+                // Use enough pallets to carry A+F
+                // S can be carried aside
                 constraint palettes[d][v][c] * max_palette_capacity >= visits_l[d][v][c] * (serve_a[d][v][c] + serve_f[d][v][c]);
             } 
 
+            // Delivery capacity constraints
             constraint sum[c in 0...n](palettes[d][v][c]) <= sizes[v] ;
             constraint sum[c in 0...n](load[d][v][c]) <= capacities[v] ;
 
+            // Pickup capacity constraints
             constraint sum[p in 0...n_pdr](weight[p] * visits_r[d][v][p]) <= capacities[v];
+            // We assume a single palette is used for each pickup
             constraint sum[p in 0...n_pdr](visits_r[d][v][p]) <= sizes[v];
 
+            // Deliver first, then pickup
             route_dist[d][v] <- 
                 + (liv ? dist_from_depot[livraisons[d][v][0]] 
                         + sum(1...n_livraisons[d][v], i => dist_matrix[livraisons[d][v][i - 1]][livraisons[d][v][i]]) 
@@ -255,27 +273,29 @@ function model() {
         }
     }
 
-    // Visit points de ramasse enough times each week
-    for [pdr in 0...n_pdr] {
+    // Pickup each site enough times each week
+    for [p in 0...n_pdr] {
         for [d in 0...n_days] {
 
+            // How many times do we have to pickup p on day d ?
             n_ramasses = 0 ;
-            for [j in j_de_ramasse[pdr]] {
+            for [j in j_de_ramasse[p]] {
                 if (j==d) {
                     n_ramasses += 1 ;
                 }
             }
 
-            if (use_pl[d] == pdr) {
+            // Use the PL for one pickup, if specified
+            if (use_pl[d] == p) {
                 n_ramasses -= 1 ;
-                constraint visits_r[d][0][pdr] ;
+                constraint visits_r[d][0][p] ;
             }
 
-            constraint sum[v in 1...m : frais[v] == "Oui"](visits_r[d][v][pdr]) == n_ramasses ; 
+            constraint sum[v in 1...m : frais[v] == "Oui"](visits_r[d][v][p]) == n_ramasses ; 
         }
     }
 
-    // Meet demands
+    // Meet demands for each product type
     for [c in 0...n] {
         constraint sum[d in 0...n_days][v in 0...m](visits_l[d][v][c] * serve_a[d][v][c]) >= demands["a"][c];
         constraint sum[d in 0...n_days][v in 0...m](visits_l[d][v][c] * serve_f[d][v][c]) >= demands["f"][c];
