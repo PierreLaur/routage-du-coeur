@@ -29,7 +29,7 @@ function input() {
         if(semaine_livraison == 0 || semaine_livraison == week) {
             index_to_centre[i] = c ;
             i += 1 ;
-        };
+        }
     }
 
     n = index_to_centre.count();
@@ -247,8 +247,8 @@ function model() {
         }
     }
 
+    // Visit points de ramasse enough times each week
     for [pdr in 0...n_pdr] {
-        // Visit points de ramasse enough times each week
         for [d in 0...n_days] {
 
             n_ramasses = 0 ;
@@ -267,8 +267,6 @@ function model() {
         }
     }
 
-
-
     // Meet demands
     for [c in 0...n] {
         constraint sum[d in 0...n_days][v in 0...m](visits_l[d][v][c] * serve_a[d][v][c]) >= demands["a"][c];
@@ -279,14 +277,6 @@ function model() {
     total_distance <- sum[d in 0...n_days][v in 0...m](route_dist[d][v]);
 
     minimize total_distance;
-}
-
-function param() {
-
-    // lsVerbosity = 1;
-    // lsTimeLimit = 120;
-    // lsNbThreads = 32;
-    // lsSeed = 1 ;
 }
 
 function write_solution() {
@@ -344,6 +334,7 @@ function output(){
     write_solution();
 
     println("\nTotal distance : ", total_distance.value/1000);
+
 }
 
 function callback(ls, cbType) {
@@ -366,6 +357,7 @@ function main(args) {
     initfile=args[0] == "nil" ? nil : args[0];
     outfile=args[1];
     week=args[2].toInt();
+    timelimit= args.count() >= 4 ? args[3].toInt() : nil ;
 
     lastBestValue = inf - 1 ;
     lastBestRunningTime = 0;
@@ -379,16 +371,19 @@ function main(args) {
         model();
 
         // set_initial_solution(true);
-        // fix(0.8);
+        // fix(1);
 
         ls.model.close();
+        if (timelimit != nil) {
+            ls.param.timeLimit = timelimit ;
+            // ls.param.timeLimit = 2;
+        }
 
         if (initfile != nil) {
             set_initial_solution(false, nil);
         }
-        param();
 
         ls.solve();
+        output();
     }
-    output();
 }
