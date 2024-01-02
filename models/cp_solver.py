@@ -379,7 +379,7 @@ def solve_vrp(
 
     # # Add hints
     if hint:
-        add_hints(model, pb, arcs, visits, delivers, palettes, hint)
+        add_hints(model, pb, arcs, visits, delivers, palettes, hint, force=False)
 
     # Every customer must be served exactly his demand
     for c in range(1, pb.n):
@@ -401,11 +401,12 @@ def solve_vrp(
         #     >= pb.demands["a"][c] + pb.demands["f"][c]
         # )
 
-    # add_domsym_breaking(model, n, m, n_days, delivers, visits)
+    # # add_domsym_breaking(model, n, m, n_days, delivers, visits)
 
     # Capacity constraints
     for d in range(pb.n_days):
         for v in range(pb.m):
+            # Delivery
             model.Add(
                 sum(
                     [
@@ -418,7 +419,19 @@ def solve_vrp(
                 <= pb.capacities[v]
             )
 
+            # Pickup
+            model.Add(
+                sum([pb.weights[p] * visits[d, v, p + pb.n] for p in range(pb.n_pdr)])
+                <= pb.capacities[v]
+            )
+
             model.Add(sum([palettes[d, v, c] for c in range(pb.n)]) <= pb.sizes[v])
+
+            # Single palette per ramasse
+            model.Add(
+                sum(visits[d, v, p] for p in range(pb.n, pb.n + pb.n_pdr))
+                <= pb.sizes[v]
+            )
 
     # Minimize total distance
     total_distance = sum(

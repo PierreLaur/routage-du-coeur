@@ -85,10 +85,7 @@ def check_solution_file(
                 assert (
                     sum(palettes[d, v, c] for c in tours_flat[d, v][1:-1] if c < pb.n)
                     <= pb.sizes[v]
-                ), [
-                    sum(palettes[d, v, c] for c in tours_flat[d, v][1:-1] if c < pb.n),
-                    pb.sizes[v],
-                ]
+                )
 
     assert obj == int(total_distance), [obj, total_distance]
 
@@ -105,6 +102,16 @@ def check_solution_file(
             assert n_visits == pb.j_de_ramasse[p].count(d)
             if (d, p) in pb.use_pl:
                 assert node in tours_flat[d, 0]
+
+    for d in range(pb.n_days):
+        for v in range(pb.m):
+            if not (d, v) in tours_flat:
+                continue
+            assert len([p for p in tours_flat[d, v] if p > pb.n]) <= pb.sizes[v]
+            assert (
+                sum([pb.weights[p - pb.n] for p in tours_flat[d, v] if p > pb.n])
+                <= pb.capacities[v]
+            )
 
     for c in range(pb.n):
         assert (

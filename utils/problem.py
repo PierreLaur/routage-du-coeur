@@ -10,7 +10,8 @@ class Problem:
     n_pdr: int
     m: int
     n_days: int
-    demands: int
+    demands: list[int]
+    weights: list[int]
     j_de_ramasse: list[list[int]]
     use_pl: set[tuple[int, int]]
     capacities: list[int]
@@ -42,6 +43,8 @@ def read_problem(
         "s": centres["Tonnage Surgelé (kg)"].fillna(0).astype(int).tolist(),
     }
 
+    weights = points_de_ramasse["Poids par ramasse(kg)"].fillna(0).astype(int).tolist()
+
     # Ignore centres that are not delivered this week :
     for i in range(n):
         # 0 = every week
@@ -55,6 +58,8 @@ def read_problem(
         demands["a"][c] = ceil(demands["a"][c] * 1.15)
         demands["f"][c] = ceil(demands["f"][c] * 1.15)
         demands["s"][c] = ceil(demands["s"][c] * 1.15)
+    for p in range(n_pdr):
+        weights[p] = ceil(weights[p] * 1.15)
 
     # Demand for depot is set to 0
     for d in demands.values():
@@ -82,6 +87,7 @@ def read_problem(
         m,
         n_days,
         demands,
+        weights,
         j_de_ramasse,
         use_pl,
         capacities,

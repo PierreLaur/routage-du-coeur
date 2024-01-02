@@ -3,47 +3,66 @@ import pandas as pd
 import plotly.graph_objects as go
 import sys
 import json
+from problem import Problem, read_problem
 
 
-def read_solution(file):
+def pretty_print_solution(file, week):
     with open(file) as f:
         sol = json.load(f)
 
+        centres = pd.read_excel("data/centres.xlsx")
+        vehicles = pd.read_excel("data/vehicules.xlsx", index_col=0)
+
+        pb = read_problem(
+            "data/centres.xlsx",
+            "data/points_de_ramasse.xlsx",
+            "data/vehicules.xlsx",
+            "data/euclidean_matrix.xlsx",
+            week,
+        )
+
         obj = sol["total_distance"]
+        tours_strkey = sol["tours"]
+        tours = {}
 
-        tours = sol["tours"]
+        for key, tour in tours_strkey.items():
+            d, v = map(int, key.split(", "))
+            tours[d, v] = tour
 
+        jours_map = {0: "Lundi", 1: "Mardi", 2: "Mercredi", 3: "Jeudi", 4: "Vendredi"}
 
-def pretty_print_solution(file):
-    with open(file) as f:
-        sol = json.load(f)
+        output = ""
+        output += f"- - - - - - TOURNEES SEMAINE {week} - - - - - -\n"
+        for d in range(pb.n_days):
+            if not any((d, v) in tours for v in range(pb.m)):
+                continue
 
-        obj = sol["total_distance"]
-        tours = sol["tours"]
+            output += f"\n- - - - {jours_map[d].upper()} - - - -\n\n"
+            for v in range(pb.m):
+                if not (d, v) in tours:
+                    continue
 
-        print("")
+                output += f"\tVéhicule {v} ({vehicles.index[v]}) \n"
+                tour = tours[d, v]
 
-    # TODO
-    # for d in range(n_days):
-    #     print(f"-- JOUR {d} --")
-    #     for v in range(m):
-    #         if len(tours[d, v]) == 1:
-    #             continue
-    #         print(f"Vehicule {v} ({vehicles.index[v]}) tour : \n", end="")
+                for place in tour:
+                    product_types = ""
+                    palettes = ""
+                    if place["type"] == "livraison":
+                        for i, product_type in enumerate("AFS"):
+                            if place["delivery"][i] > 0:
+                                product_types += product_type
 
-    #         for t in tours[d, v]:
-    #             delivery = None
-    #             pals = 0
-    #             name = matrix.index[t]
-    #             if t == 0 or t >= n:
-    #                 continue
-    #             else:
-    #                 delivery = tuple(deliveries[i][d, v, t] for i in range(3))
-    #                 pals = palettes[d, v, t]
-    #             print(
-    #                 f"\t{name:20} {str(delivery) if delivery else ''} {' - ' + str(pals)+' palettes'}"
-    #             )
-    pass
+                        palettes = f"{place['palettes']} palette{'s' if place['palettes'] > 1 else ''}"
+
+                    else:
+                        product_types = "Ramasse"
+
+                    output += f"\t\t{place['name']:30}\t{product_types}\t{palettes}\n"
+
+        output += f"\nDistance totale : {round(obj/1000):d}km"
+
+        return output
 
 
 def plot_solution(file):
@@ -89,4 +108,8 @@ def plot_solution(file):
 
 
 if __name__ == "__main__":
-    read_solution(sys.argv[1])
+    output = pretty_print_solution(sys.argv[1], week=int(sys.argv[2]))
+
+    with open(f"solutions/week_{sys.argv[2]}.txt", "w") as f:
+        f.write(output)
+    print(output)

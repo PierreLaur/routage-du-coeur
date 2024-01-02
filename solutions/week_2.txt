@@ -1,0 +1,100 @@
+- - - - - - TOURNEES SEMAINE 2 - - - - - -
+
+- - - - LUNDI - - - -
+
+	Véhicule 0 (Poids Lourd) 
+		Blagnac                       	AS	2 palettes
+		Pibrac                        	AS	3 palettes
+		Rieumes                       	AS	1 palette
+		Cugnaux                       	AS	1 palette
+		Portet sur Garonne            	AS	1 palette
+		Toulouse/Grande-Bretagne(Casselardit)	AS	1 palette
+	Véhicule 2 (Camion Frigo) 
+		Toulouse/Malepere             	AFS	1 palette
+		Revel                         	AFS	1 palette
+		Super U Flourens              	Ramasse	
+		Leclerc Rouffiac              	Ramasse	
+	Véhicule 3 (Camion Frigo) 
+		Escalquens                    	AFS	2 palettes
+		Leclerc St Orens              	Ramasse	
+	Véhicule 4 (Camion Frigo) 
+		Pibrac                        	AFS	2 palettes
+		Leclerc Blagnac               	Ramasse	
+		METRO                         	Ramasse	
+
+- - - - MARDI - - - -
+
+	Véhicule 3 (Camion Frigo) 
+		Muret                         	AFS	1 palette
+		Leclerc Rouffiac              	Ramasse	
+	Véhicule 6 (Camion Frigo) 
+		Saint-Gaudens                 	AF	2 palettes
+		Leclerc St Orens              	Ramasse	
+		Super U Flourens              	Ramasse	
+	Véhicule 8 (Camion Frigo) 
+		Fenouillet                    	AFS	1 palette
+		METRO                         	Ramasse	
+
+- - - - MERCREDI - - - -
+
+	Véhicule 0 (Poids Lourd) 
+		Toulouse/Malepere             	AS	7 palettes
+		Escalquens                    	AS	2 palettes
+		Toulouse/Negogousses(Les Arenes)	AS	2 palettes
+		Tournefeuille                 	AS	1 palette
+		Carrefour Supply Chain        	Ramasse	
+	Véhicule 2 (Camion Frigo) 
+		Tournefeuille                 	AFS	1 palette
+		Plaisance du Touch            	AFS	1 palette
+		Carrefour Supply Chain        	Ramasse	
+		METRO                         	Ramasse	
+	Véhicule 7 (Camion Frigo) 
+		Toulouse/Grande-Bretagne(Casselardit)	FS	2 palettes
+		Leclerc Rouffiac              	Ramasse	
+	Véhicule 8 (Camion Frigo) 
+		Pibrac                        	AFS	1 palette
+		Salies du Salat/Mane          	AFS	2 palettes
+		Leclerc St Orens              	Ramasse	
+		Super U Flourens              	Ramasse	
+		Auchan Gramont                	Ramasse	
+
+- - - - JEUDI - - - -
+
+	Véhicule 4 (Camion Frigo) 
+		Toulouse/Malepere             	AFS	1 palette
+		Leclerc St Orens              	Ramasse	
+		Super U Flourens              	Ramasse	
+	Véhicule 8 (Camion Frigo) 
+		Carbonne                      	AFS	1 palette
+		Auterive                      	AF	1 palette
+		Leclerc Blagnac               	Ramasse	
+		METRO                         	Ramasse	
+
+- - - - VENDREDI - - - -
+
+	Véhicule 3 (Camion Frigo) 
+		Toulouse/Negogousses(Les Arenes)	AFS	2 palettes
+	Véhicule 4 (Camion Frigo) 
+		Rieumes                       	AFS	1 palette
+		Montrejeau                    	AFS	1 palette
+		Cazeres                       	AFS	1 palette
+	Véhicule 5 (Camion Frigo) 
+		Levignac                      	AFS	1 palette
+		Leguevin                      	AFS	1 palette
+		Carrefour Supply Chain        	Ramasse	
+		METRO                         	Ramasse	
+	Véhicule 6 (Camion Frigo) 
+		Cugnaux                       	AFS	1 palette
+		Villefranche de Lauragais     	AFS	1 palette
+		Leclerc St Orens              	Ramasse	
+		Super U Flourens              	Ramasse	
+		Auchan Gramont                	Ramasse	
+	Véhicule 7 (Camion Frigo) 
+		Toulouse/Negogousses(Les Arenes)	AFS	1 palette
+		Leclerc Rouffiac              	Ramasse	
+	Véhicule 8 (Camion Frigo) 
+		Portet sur Garonne            	AFS	1 palette
+		Blagnac                       	AFS	1 palette
+		Leclerc Blagnac               	Ramasse	
+
+Distance totale : 1621km

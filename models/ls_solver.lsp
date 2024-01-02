@@ -58,6 +58,10 @@ function input() {
         demands["s"][i] = ceil(centres.rows[centre+1][6] * 1.15); // Add 15% for robustness
     }
 
+    for [p in 0...n_pdr] {
+        weight[p] = ceil(pdr.rows[p][6] * 1.15);
+    }
+
     for [i in 0...m] {
         row = vehicles.rows[i];
         capacities[i] = row[1];
@@ -229,8 +233,12 @@ function model() {
                 palettes[d][v][c] <- int(0, sizes[v]);
                 constraint palettes[d][v][c] * max_palette_capacity >= visits_l[d][v][c] * (serve_a[d][v][c] + serve_f[d][v][c]);
             } 
+
             constraint sum[c in 0...n](palettes[d][v][c]) <= sizes[v] ;
             constraint sum[c in 0...n](load[d][v][c]) <= capacities[v] ;
+
+            constraint sum[p in 0...n_pdr](weight[p] * visits_r[d][v][p]) <= capacities[v];
+            constraint sum[p in 0...n_pdr](visits_r[d][v][p]) <= sizes[v];
 
             route_dist[d][v] <- 
                 + (liv ? dist_from_depot[livraisons[d][v][0]] 
@@ -371,7 +379,7 @@ function main(args) {
         model();
 
         // set_initial_solution(true);
-        // fix(1);
+        // fix(0.5);
 
         ls.model.close();
         if (timelimit != nil) {
