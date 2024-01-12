@@ -52,14 +52,20 @@ def pretty_print_solution(file, week):
                     if place["type"] == "livraison":
                         for i, product_type in enumerate("AFS"):
                             if place["delivery"][i] > 0:
-                                product_types += product_type
+                                product_types += (
+                                    f"{str(place['delivery'][i])+product_type:5}"
+                                )
+                            else:
+                                product_types += f"{'':5}"
 
-                        palettes = f"{place['palettes']} palette{'s' if place['palettes'] > 1 else ''}"
-
+                        pals = place["palettes"]
+                        palettes = f"{pals[0]}P" if pals[0] else "  "
+                        palettes += f" {pals[1]}/2PF" if pals[1] else "      "
+                        palettes += f" {pals[2]}/2PS" if pals[2] else "      "
                     else:
                         product_types = "Ramasse"
 
-                    output += f"\t\t{place['name']:30}\t{product_types}\t{palettes}\n"
+                    output += f"\t\t{place['name']:35}\t{product_types}\t{palettes}\n"
 
         output += f"\nDistance totale : {round(obj/1000):d}km"
 

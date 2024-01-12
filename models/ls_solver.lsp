@@ -12,6 +12,13 @@ function input() {
 
     max_palette_capacity = 800 ;
     
+    // At most s_handling_limit kg of surgelé can be put in norvégiennes for a single client
+    // If the amount is higher than that, it will have to be put on a demi palette in a camion frigo
+    s_handling_limit = 120 ;
+
+    max_stops = 5 ;
+    norvegienne_capacity = 40 ;
+    
     centres = csv.parse("data/centres.csv");
     pdr = csv.parse("data/points_de_ramasse.csv");
     matrix = csv.parse("data/euclidean_matrix.csv");
@@ -214,6 +221,17 @@ function set_initial_solution(force, specific_vd) {
     
 }
 
+function add_specific_requirements() {
+    // These are not written in the input files but have been specified by the client
+
+    // The PL must visit Carrefour Centrale on Wednesday
+    if (week==2) {
+        constraint visits_r[2][0][5] ;
+        // He must only do one pickup
+        constraint n_ramasses[2][0] == 1;
+    }
+}
+
 function model() {
 
     livraisons[d in 0...n_days][v in 0...m] <- list(n);
@@ -241,15 +259,15 @@ function model() {
             
             for [c in 0...n] {
                 load[d][v][c] <- visits_l[d][v][c] * (serve_a[d][v][c] + serve_f[d][v][c] + serve_s[d][v][c]) ;
-                palettes[d][v][c] <- int(0, sizes[v]);
-
-                // Use enough pallets to carry A+F
-                // S can be carried aside
-                constraint palettes[d][v][c] * max_palette_capacity >= visits_l[d][v][c] * (serve_a[d][v][c] + serve_f[d][v][c]);
+                palettes[d][v][c] <- ceil(visits_l[d][v][c] * serve_a[d][v][c] / max_palette_capacity) ;
+                demi_palettes[d][v][c] <- ceil(visits_l[d][v][c] * serve_f[d][v][c] / (0.5*max_palette_capacity)) ;
+                demi_palettes_s[d][v][c] <- serve_s[d][v][c]>s_handling_limit? 
+                                            ceil(visits_l[d][v][c] * serve_s[d][v][c] 
+                                                    / (0.5*max_palette_capacity)) : 0 ;
             } 
 
             // Delivery capacity constraints
-            constraint sum[c in 0...n](palettes[d][v][c]) <= sizes[v] ;
+            constraint sum[c in 0...n](palettes[d][v][c] + 0.5 * (demi_palettes[d][v][c] + demi_palettes_s[d][v][c])) <= sizes[v] ;
             constraint sum[c in 0...n](load[d][v][c]) <= capacities[v] ;
 
             // Pickup capacity constraints
@@ -270,6 +288,9 @@ function model() {
                 + (ram ? dist_to_depot[ramasses[d][v][n_ramasses[d][v]-1] + n] : 0) 
                         + sum(1...n_ramasses[d][v], i => dist_matrix[ramasses[d][v][i - 1] + n][ramasses[d][v][i] + n])
                 ;
+
+            // Max number of stops in a single trip
+            constraint n_livraisons[d][v] + n_ramasses[d][v] <= max_stops ;
         }
     }
 
@@ -277,21 +298,15 @@ function model() {
     for [p in 0...n_pdr] {
         for [d in 0...n_days] {
 
-            // How many times do we have to pickup p on day d ?
-            n_ramasses = 0 ;
+            // How many times do we have to pickup p on day d ? (it's either 1 or 0 as of now (01/23))
+            n_ram = 0 ;
             for [j in j_de_ramasse[p]] {
                 if (j==d) {
-                    n_ramasses += 1 ;
+                    n_ram += 1 ;
                 }
             }
 
-            // Use the PL for one pickup, if specified
-            if (use_pl[d] == p) {
-                n_ramasses -= 1 ;
-                constraint visits_r[d][0][p] ;
-            }
-
-            constraint sum[v in 1...m : frais[v] == "Oui"](visits_r[d][v][p]) == n_ramasses ; 
+            constraint sum[v in 1...m : frais[v] == "Oui"](visits_r[d][v][p]) == n_ram ; 
         }
     }
 
@@ -301,6 +316,8 @@ function model() {
         constraint sum[d in 0...n_days][v in 0...m](visits_l[d][v][c] * serve_f[d][v][c]) >= demands["f"][c];
         constraint sum[d in 0...n_days][v in 0...m](visits_l[d][v][c] * serve_s[d][v][c]) >= demands["s"][c];
     }
+
+    add_specific_requirements() ;
 
     total_distance <- sum[d in 0...n_days][v in 0...m](route_dist[d][v]);
 
@@ -335,8 +352,11 @@ function write_solution() {
                 delivery = {serve_a[d][v][node].value, serve_f[d][v][node].value, serve_s[d][v][node].value};
                 place["delivery"] = delivery;
 
-                pals = palettes[d][v][node].value;
-                place["palettes"] = pals;
+                place["palettes"] = {
+                        palettes[d][v][node].value,
+                        demi_palettes[d][v][node].value,
+                        demi_palettes_s[d][v][node].value
+                };
 
                 sol["tours"][key].add(place);
             }
