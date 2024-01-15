@@ -2,45 +2,42 @@
 
 - - - - LUNDI - - - -
 
-	Véhicule 0 (Poids Lourd) 
+	Véhicule 1 (Petit Poids Lourd) 
 		Pibrac                                  	1623A          	3PA            
-		Toulouse/Negogousses(Les Arenes)        	2138A     363S 	3PA       3/2PS
-		Bessieres                               	555A      64S  	1PA       5/2PS
+		Toulouse/Negogousses(Les Arenes)        	2138A     86S  	3PA             +3 norvégiennes
 	Véhicule 2 (Camion Frigo) 
-		Plaisance du Touch                      	252A 99F  32S  	1PA 1/2PF 1/2PS
-		Fonsorbes                               	516A 287F 75S  	1PA 1/2PF 1/2PS
-	Véhicule 3 (Camion Frigo) 
-		L Isle en Dodon                         	90A  334F      	1PA 1/2PF      
-		Carbonne                                	351A 145F 27S  	1PA 1/2PF 1/2PS
-	Véhicule 4 (Camion Frigo) 
-		Portet sur Garonne                      	731A 274F 103S 	1PA 1/2PF 1/2PS
-		Bessieres                               	     252F 13S  	    1/2PF 1/2PS
-		Auchan Gramont                          	Ramasse	
-	Véhicule 5 (Camion Frigo) 
-		Pibrac                                  	     1021F314S 	    3/2PF 1/2PS
-		Leclerc Blagnac                         	Ramasse	
-	Véhicule 8 (Camion Frigo) 
-		Muret                                   	291A 434F 78S  	1PA 2/2PF 1/2PS
-		Auterive                                	133A 103F      	1PA 1/2PF      
+		Toulouse/Malepere                       	     964F 198S 	    3/2PF 1/2PS
 		Leclerc St Orens                        	Ramasse	
 		Super U Flourens                        	Ramasse	
+	Véhicule 3 (Camion Frigo) 
+		Carbonne                                	351A 145F 27S  	1PA 1/2PF       +1 norvégienne
+		Muret                                   	291A 434F 78S  	1PA 2/2PF 1/2PS
+	Véhicule 4 (Camion Frigo) 
+		Bessieres                               	555A 252F 64S  	1PA 1/2PF 1/2PS
+		Auchan Gramont                          	Ramasse	
+	Véhicule 5 (Camion Frigo) 
+		Pibrac                                  	     1021F314S 	    3/2PF 4/2PS
+		Leclerc Blagnac                         	Ramasse	
+	Véhicule 6 (Camion Frigo) 
+		Fonsorbes                               	516A 287F 75S  	1PA 1/2PF 1/2PS
+	Véhicule 7 (Camion Frigo) 
+		Portet sur Garonne                      	731A 274F 103S 	1PA 1/2PF 1/2PS
 
 - - - - MARDI - - - -
 
 	Véhicule 2 (Camion Frigo) 
 		Tournefeuille                           	681A 406F 30S  	1PA 2/2PF 1/2PS
 		Leclerc Blagnac                         	Ramasse	
-	Véhicule 4 (Camion Frigo) 
-		Villefranche de Lauragais               	91A  196F 34S  	1PA 1/2PF 1/2PS
+	Véhicule 6 (Camion Frigo) 
+		L Isle en Dodon                         	90A  334F      	1PA 1/2PF      
+		Saint-Gaudens                           	467A 375F      	1PA 2/2PF      
+	Véhicule 7 (Camion Frigo) 
+		Cazeres                                 	160A 115F 13S  	1PA 1/2PF 1/2PS
+		Salies du Salat/Mane                    	328A 298F 64S  	1PA 1/2PF 1/2PS
+	Véhicule 8 (Camion Frigo) 
 		Revel                                   	286A 280F 73S  	1PA 1/2PF 1/2PS
 		Leclerc St Orens                        	Ramasse	
 		Auchan Gramont                          	Ramasse	
-	Véhicule 6 (Camion Frigo) 
-		Cazeres                                 	160A 115F 13S  	1PA 1/2PF 1/2PS
-		Saint-Gaudens                           	467A 375F      	1PA 2/2PF      
-	Véhicule 8 (Camion Frigo) 
-		Bagneres de Luchon                      	90A  288F 41S  	1PA 1/2PF 1/2PS
-		Salies du Salat/Mane                    	328A 298F 64S  	1PA 1/2PF 1/2PS
 
 - - - - MERCREDI - - - -
 
@@ -48,48 +45,51 @@
 		Leclerc Rouffiac                        	Ramasse	
 	Véhicule 2 (Camion Frigo) 
 		Leclerc Rouffiac                        	Ramasse	
-	Véhicule 4 (Camion Frigo) 
-		Toulouse/Malepere                       	     964F 198S 	    3/2PF 1/2PS
+	Véhicule 6 (Camion Frigo) 
+		Fenouillet                              	118A 189F 30S  	1PA 1/2PF 1/2PS
+		Villefranche de Lauragais               	91A  196F 34S  	1PA 1/2PF 1/2PS
 		Leclerc St Orens                        	Ramasse	
 		Auchan Gramont                          	Ramasse	
 	Véhicule 7 (Camion Frigo) 
-		Fenouillet                              	118A 189F 30S  	1PA 1/2PF 1/2PS
-		Fronton                                 	516A 287F 75S  	1PA 1/2PF 1/2PS
-	Véhicule 8 (Camion Frigo) 
-		Blagnac                                 	701A 429F 99S  	1PA 2/2PF 1/2PS
+		Blagnac                                 	701A 429F 99S  	1PA 2/2PF 2/2PS
 		Leclerc Blagnac                         	Ramasse	
 		METRO                                   	Ramasse	
 
 - - - - JEUDI - - - -
 
-	Véhicule 0 (Poids Lourd) 
-		Toulouse/Malepere                       	4933A          	7PA       1/2PS
-		Toulouse/Grande-Bretagne(Casselardit)   	705A      16S  	1PA       1/2PS
-		Leguevin                                	196A      33S  	1PA       1/2PS
 	Véhicule 3 (Camion Frigo) 
-		Toulouse/Grande-Bretagne(Casselardit)   	     889F 175S 	    3/2PF 1/2PS
-		Montrejeau                              	98A  106F 7S   	1PA 1/2PF       +1 norvégienne
+		Montrejeau                              	98A  106F 7S   	1PA 1/2PF 1/2PS
+		Auterive                                	133A 103F      	1PA 1/2PF      
 		Leclerc St Orens                        	Ramasse	
 		Super U Flourens                        	Ramasse	
-	Véhicule 6 (Camion Frigo) 
+	Véhicule 5 (Camion Frigo) 
+		Toulouse/Grande-Bretagne(Casselardit)   	705A 188F 82S  	1PA 1/2PF 1/2PS
 		Auchan Gramont                          	Ramasse	
+	Véhicule 6 (Camion Frigo) 
+		Fronton                                 	516A 287F 75S  	1PA 1/2PF 1/2PS +1 norvégienne
+	Véhicule 8 (Camion Frigo) 
+		Toulouse/Grande-Bretagne(Casselardit)   	     701F 117S 	    2/2PF 1/2PS
+		Leguevin                                	196A 121F 33S  	1PA 1/2PF 1/2PS
 
 - - - - VENDREDI - - - -
 
+	Véhicule 0 (Poids Lourd) 
+		Toulouse/Malepere                       	4933A          	7PA            
+		Escalquens                              	1137A          	2PA            
 	Véhicule 2 (Camion Frigo) 
+		Escalquens                              	     801F 109S 	    3/2PF 1/2PS
 		Leclerc Rouffiac                        	Ramasse	
 	Véhicule 4 (Camion Frigo) 
-		Escalquens                              	337A 596F 106S 	1PA 2/2PF 1/2PS
+		Toulouse/Negogousses(Les Arenes)        	     1118F280S 	    4/2PF 1/2PS
 		Leclerc St Orens                        	Ramasse	
-	Véhicule 5 (Camion Frigo) 
-		Escalquens                              	800A 205F 3S   	1PA 1/2PF 1/2PS
 		Super U Flourens                        	Ramasse	
+	Véhicule 5 (Camion Frigo) 
 		Auchan Gramont                          	Ramasse	
 	Véhicule 7 (Camion Frigo) 
-		Toulouse/Negogousses(Les Arenes)        	     1118F2S   	    4/2PF 1/2PS
-		Leguevin                                	     121F 27S  	    1/2PF 1/2PS
+		Bagneres de Luchon                      	90A  288F 41S  	1PA 1/2PF 1/2PS
+		Plaisance du Touch                      	252A 99F  32S  	1PA 1/2PF 1/2PS
 		Leclerc Blagnac                         	Ramasse	
 		METRO                                   	Ramasse	
 
-Distance totale : 1793km
-Véhicules utilisés : 1 Poids Lourd - 0 Petit Poids Lourd - 5 Camion Frigo - 0 Fourgon
+Distance totale : 1849km
+Véhicules utilisés : 1 Poids Lourd - 1 Petit Poids Lourd - 6 Camion Frigo - 0 Fourgon

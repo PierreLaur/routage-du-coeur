@@ -11,6 +11,7 @@ def bench_assignments():
     assignments.csv file with the results"""
 
     centres = pd.read_csv("data/centres_original.csv")
+
     semi_hebdo = list()
     for i in range(len(centres)):
         if centres["Semaine"][i] != 0:
@@ -34,6 +35,20 @@ def bench_assignments():
 
         res = {}
         print(f"\n- - - - EVALUATING ASSIGNMENT {index+1}/{len(assignments)} - - - -\n")
+
+        print(
+            f"Semaine 1 : ",
+            ", ".join(
+                [centres["Nom"][i] for ind, i in enumerate(semi_hebdo) if a[ind] == 1]
+            ),
+        )
+        print(
+            f"Semaine 2 : ",
+            ", ".join(
+                [centres["Nom"][i] for ind, i in enumerate(semi_hebdo) if a[ind] == 2]
+            ),
+        )
+
         for week in [1, 2]:
             print("\n- - - - - - - - WEEK ", week, "\n")
 
@@ -76,3 +91,7 @@ def bench_assignments():
     assignments_df.to_csv("data/assignments.csv")
 
     centres.to_csv("data/centres.csv", index=False)
+
+
+if __name__ == "__main__":
+    bench_assignments()

@@ -214,7 +214,7 @@ def check_solution_file(
             >= pb.demands["s"][c]
         )
 
-    print("Assertions ok")
+    print("No constraint violations detected - the solution is valid.")
 
 
 if __name__ == "__main__":
