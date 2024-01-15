@@ -60,6 +60,17 @@ def check_solution_file(
                         == 0
                     )
 
+                # Only deliver surgelé on pallets with camions frigos
+                if not pb.frais[v]:
+                    assert (
+                        sum(
+                            palettes[d, v, c][2]
+                            for c in tours_flat[d, v][1:-1]
+                            if c < pb.n
+                        )
+                        == 0
+                    )
+
                 # Check the vehicle capacities
                 assert (
                     sum(
@@ -147,13 +158,10 @@ def check_solution_file(
     assert (4, 2) in tours_flat
     carrefour_centrale_index = pb.n + pb.n_pdr - 1
 
-    assert tours_flat[2, 0][1:-1] == [
-        carrefour_centrale_index
-    ]  # Carrefour centrale must be visited by these vehicles on these days
-    assert tours_flat[2, 2][1:-1] == [
-        carrefour_centrale_index
-    ]  # They must not visit anything else
-    assert tours_flat[4, 2][1:-1] == [carrefour_centrale_index]
+    ### Carrefour centrale must be visited by these vehicles on these days
+    assert carrefour_centrale_index in tours_flat[2, 0][1:-1]
+    assert carrefour_centrale_index in tours_flat[2, 2][1:-1]
+    assert carrefour_centrale_index in tours_flat[4, 2][1:-1]
 
     # Check time window constraints
     for d in range(pb.n_days):

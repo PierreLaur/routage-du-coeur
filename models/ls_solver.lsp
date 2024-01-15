@@ -172,13 +172,14 @@ function set_initial_solution(force, specific_vd) {
                         constraint livraisons[d][v][i] == index;
                         constraint visits_l[d][v][index] == 1 ;
                         i += 1 ;
-                        constraint palettes[d][v][index] == place["palettes"];
+                        constraint demi_palettes_s[d][v][index] == place["palettes"][2];
+                        constraint norvegiennes[d][v][index] == place["norvegiennes"];
                         constraint serve_a[d][v][index] >= place["delivery"][0] ;
                         constraint serve_f[d][v][index] >= place["delivery"][1] ;
                         constraint serve_s[d][v][index] >= place["delivery"][2] ;
                     } else {
                         livraisons[d][v].value.add(index);
-                        palettes[d][v][index].value = place["palettes"];
+                        norvegiennes[d][v][index].value = place["norvegiennes"];
 
                         if (place["delivery"][0] > demands["a"][index]) {
                             serve_a[d][v][index].value = 0;
@@ -187,6 +188,7 @@ function set_initial_solution(force, specific_vd) {
                         }
 
                         if (frais[v] == "Oui") {
+                            demi_palettes_s[d][v][index].value = place["palettes"][2];
                             if (place["delivery"][1] > demands["f"][index]) {
                                 serve_f[d][v][index].value = 0;
                             } else {
@@ -267,8 +269,8 @@ function model() {
                 palettes[d][v][c] <- ceil(visits_l[d][v][c] * serve_a[d][v][c] / max_palette_capacity) ;
                 demi_palettes[d][v][c] <- ceil(visits_l[d][v][c] * serve_f[d][v][c] / demi_palette_capacity);
 
-                demi_palettes_s[d][v][c] <- int(0, sizes[v]) ;
-                norvegiennes[d][v][c] <- int(0, n_norvegiennes) ;
+                demi_palettes_s[d][v][c] <- frais[v] == "Oui" ? int(0, sizes[v]) : 0;
+                norvegiennes[d][v][c] <- int(0, n_norvegiennes);
 
                 constraint visits_l[d][v][c] * serve_s[d][v][c] <= 
                                 norvegiennes[d][v][c] * norvegienne_capacity +
@@ -448,7 +450,7 @@ function main(args) {
         model();
 
         // set_initial_solution(true);
-        // fix(0.5);
+        // fix(0.4);
 
         ls.model.close();
         if (timelimit != nil) {
