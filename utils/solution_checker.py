@@ -28,6 +28,7 @@ def check_solution_file(
     tours_flat = {}
     deliveries = {}
     palettes = {}
+    norvegiennes = {}
     for d in range(pb.n_days):
         for v in range(pb.m):
             key = str(d) + ", " + str(v)
@@ -43,10 +44,12 @@ def check_solution_file(
                     if b < pb.n:
                         deliveries[d, v, b] = place["delivery"]
                         palettes[d, v, b] = place["palettes"]
+                        norvegiennes[d, v, b] = place["norvegiennes"]
 
                 obj += pb.matrix.iloc[a, 0]
                 tours_flat[d, v].append(0)
 
+                # Only deliver frais with camions frigos
                 if not pb.frais[v]:
                     assert (
                         sum(
@@ -57,6 +60,7 @@ def check_solution_file(
                         == 0
                     )
 
+                # Check the vehicle capacities
                 assert (
                     sum(
                         sum(deliveries[d, v, c])
@@ -75,20 +79,51 @@ def check_solution_file(
 
                 for c in tours_flat[d, v][1:-1]:
                     if c < pb.n:
+                        # Use enough palettes for each centre
                         assert (
-                            deliveries[d, v, c][0] + deliveries[d, v, c][1]
-                        ) <= pb.max_palette_capacity * palettes[d, v, c], [
-                            deliveries[d, v, c][0] + deliveries[d, v, c][1],
-                            palettes[d, v, c],
-                        ]
+                            deliveries[d, v, c][0]
+                            <= pb.max_palette_capacity * palettes[d, v, c][0]
+                        )
+                        assert (
+                            deliveries[d, v, c][1]
+                            <= pb.demi_palette_capacity * palettes[d, v, c][1]
+                        )
 
+                        # use either palettes, norvegiennes or both but enough of them
+                        assert (
+                            deliveries[d, v, c][2]
+                            <= pb.demi_palette_capacity * palettes[d, v, c][2]
+                            + norvegiennes[d, v, c] * pb.norvegienne_capacity
+                        )
+
+                # Size limit for each vehicle
                 assert (
-                    sum(palettes[d, v, c] for c in tours_flat[d, v][1:-1] if c < pb.n)
+                    sum(
+                        palettes[d, v, c][0]
+                        + 0.5 * (palettes[d, v, c][1] + palettes[d, v, c][2])
+                        for c in tours_flat[d, v][1:-1]
+                        if c < pb.n
+                    )
                     <= pb.sizes[v]
                 )
 
+    for d in range(pb.n_days):
+        # Don't use too many norvegiennes
+        assert (
+            sum(
+                norvegiennes[d, v, c]
+                for v in range(pb.m)
+                if (d, v) in tours_flat
+                for c in tours_flat[d, v][1:-1]
+                if c < pb.n
+            )
+            <= pb.n_norvegiennes
+        )
+
+    # Check that the objective value is correct
     assert obj == int(total_distance), [obj, total_distance]
 
+    # Check that the number of pickups is correct for each day
     for p in range(pb.n_pdr):
         for d in range(pb.n_days):
             node = pb.n + p
@@ -96,23 +131,52 @@ def check_solution_file(
                 [
                     tours_flat[d, v].count(node)
                     for v in range(pb.m)
-                    if (d, v) in tours_flat
+                    if (d, v) in tours_flat and pb.frais[v]
                 ]
             )
-            assert n_visits == pb.j_de_ramasse[p].count(d)
-            if (d, p) in pb.use_pl:
-                assert node in tours_flat[d, 0]
+            assert n_visits == pb.j_de_ramasse[p].count(d), [
+                p,
+                d,
+                n_visits,
+                pb.j_de_ramasse[p].count(d),
+            ]
+
+    # Specific requirements
+    assert (2, 0) in tours_flat
+    assert (2, 2) in tours_flat
+    assert (4, 2) in tours_flat
+    carrefour_centrale_index = pb.n + pb.n_pdr - 1
+
+    assert tours_flat[2, 0][1:-1] == [
+        carrefour_centrale_index
+    ]  # Carrefour centrale must be visited by these vehicles on these days
+    assert tours_flat[2, 2][1:-1] == [
+        carrefour_centrale_index
+    ]  # They must not visit anything else
+    assert tours_flat[4, 2][1:-1] == [carrefour_centrale_index]
+
+    # Check time window constraints
+    for d in range(pb.n_days):
+        for v in range(pb.m):
+            if not (d, v) in tours_flat:
+                continue
+            for node in tours_flat[d, v][1:-1]:
+                if node < pb.n:
+                    assert d in pb.j_de_livraison_possibles[node]
 
     for d in range(pb.n_days):
         for v in range(pb.m):
             if not (d, v) in tours_flat:
                 continue
-            assert len([p for p in tours_flat[d, v] if p > pb.n]) <= pb.sizes[v]
+            # Check that not too many pickups are done - each takes 2 palettes
+            assert len([p for p in tours_flat[d, v] if p > pb.n]) * 2 <= pb.sizes[v]
+            # Capacity constraints on vehicles for the pickups
             assert (
                 sum([pb.weights[p - pb.n] for p in tours_flat[d, v] if p > pb.n])
                 <= pb.capacities[v]
             )
 
+    # Check that demands are met
     for c in range(pb.n):
         assert (
             sum(

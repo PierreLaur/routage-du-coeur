@@ -11,13 +11,11 @@ function input() {
     if (week == nil) throw usage;
 
     max_palette_capacity = 800 ;
+    demi_palette_capacity = 0.45 * max_palette_capacity ;
     
-    // At most s_handling_limit kg of surgelé can be put in norvégiennes for a single client
-    // If the amount is higher than that, it will have to be put on a demi palette in a camion frigo
-    s_handling_limit = 120 ;
-
-    max_stops = 5 ;
+    max_stops = 4 ;
     norvegienne_capacity = 40 ;
+    n_norvegiennes = 10 ;
     
     centres = csv.parse("data/centres.csv");
     pdr = csv.parse("data/points_de_ramasse.csv");
@@ -68,7 +66,7 @@ function input() {
 
     // Pickup weights (per pickup)
     for [p in 0...n_pdr] {
-        weight[p] = ceil(pdr.rows[p][6] * 1.15);
+        weight[p] = ceil(pdr.rows[p][5] * 1.15);
     }
 
     for [i in 0...m] {
@@ -81,21 +79,22 @@ function input() {
         // frais[i] = "Oui";
     }
 
-    // When do we have to pickup each site ?
     jours_map = {"Lundi": 0, "Mardi": 1, "Mercredi": 2, "Jeudi": 3, "Vendredi": 4};
-    use_pl = {};
+    // When are we allowed to deliver each centre ?
+    for [c in 0...n] {
+        index = index_to_centre[c]+1 ;
+        jours = centres.rows[index][10].split(", ") ;
+        j_de_livraison[c] = {};
+        for [k in 0...jours.count()] {
+            j_de_livraison[c].add(jours_map[jours[k]]);
+        }
+    }
+
+    // When do we have to pickup each site ?
     for [i in 0...n_pdr] {
-        jours = pdr.rows[i][3 + week].split(", ") ;
+        jours = pdr.rows[i][4].split(", ") ;
         j_de_ramasse[i] = {};
         for [k in 0...jours.count()] {
-            
-            // PL can be written to specifically ask a pickup at p on day d with the PL
-            // in which case use_pl[d] = p
-            if (jours[k].indexOf("(PL") != -1) {
-                jours[k] = jours[k].replace("(PL)", "") ;
-                use_pl[jours_map[jours[k]]] = i;
-            }
-
             j_de_ramasse[i].add(jours_map[jours[k]]);
         }
     }
@@ -225,11 +224,17 @@ function add_specific_requirements() {
     // These are not written in the input files but have been specified by the client
 
     // The PL must visit Carrefour Centrale on Wednesday
-    if (week==2) {
-        constraint visits_r[2][0][5] ;
-        // He must only do one pickup
-        constraint n_ramasses[2][0] == 1;
-    }
+    constraint visits_r[2][0][5] ;
+    // He must only do one pickup
+    constraint n_ramasses[2][0] == 1;
+
+    // The first camion Frigo must visit Carrefour Centrale on Wednesday and Friday
+    constraint visits_r[2][2][5] ;
+    constraint visits_r[4][2][5] ;
+    // To simplify we say it only does one pickup (in reality he delivers a centre afterwards)
+    constraint n_ramasses[2][2] == 1;
+    constraint n_ramasses[4][2] == 1;
+
 }
 
 function model() {
@@ -260,11 +265,16 @@ function model() {
             for [c in 0...n] {
                 load[d][v][c] <- visits_l[d][v][c] * (serve_a[d][v][c] + serve_f[d][v][c] + serve_s[d][v][c]) ;
                 palettes[d][v][c] <- ceil(visits_l[d][v][c] * serve_a[d][v][c] / max_palette_capacity) ;
-                demi_palettes[d][v][c] <- ceil(visits_l[d][v][c] * serve_f[d][v][c] / (0.5*max_palette_capacity)) ;
-                demi_palettes_s[d][v][c] <- serve_s[d][v][c]>s_handling_limit? 
-                                            ceil(visits_l[d][v][c] * serve_s[d][v][c] 
-                                                    / (0.5*max_palette_capacity)) : 0 ;
+                demi_palettes[d][v][c] <- ceil(visits_l[d][v][c] * serve_f[d][v][c] / demi_palette_capacity);
+
+                demi_palettes_s[d][v][c] <- int(0, sizes[v]) ;
+                norvegiennes[d][v][c] <- int(0, n_norvegiennes) ;
+
+                constraint visits_l[d][v][c] * serve_s[d][v][c] <= 
+                                norvegiennes[d][v][c] * norvegienne_capacity +
+                                demi_palettes_s[d][v][c] * demi_palette_capacity ;
             } 
+
 
             // Delivery capacity constraints
             constraint sum[c in 0...n](palettes[d][v][c] + 0.5 * (demi_palettes[d][v][c] + demi_palettes_s[d][v][c])) <= sizes[v] ;
@@ -272,8 +282,8 @@ function model() {
 
             // Pickup capacity constraints
             constraint sum[p in 0...n_pdr](weight[p] * visits_r[d][v][p]) <= capacities[v];
-            // We assume a single palette is used for each pickup
-            constraint sum[p in 0...n_pdr](visits_r[d][v][p]) <= sizes[v];
+            // We assume 2 palettes are used for each pickup
+            constraint sum[p in 0...n_pdr](2 * visits_r[d][v][p]) <= sizes[v];
 
             // Deliver first, then pickup
             route_dist[d][v] <- 
@@ -292,20 +302,38 @@ function model() {
             // Max number of stops in a single trip
             constraint n_livraisons[d][v] + n_ramasses[d][v] <= max_stops ;
         }
+
+        constraint sum[c in 0...n][v in 0...m](norvegiennes[d][v][c]) <= n_norvegiennes ;
+
+    }
+
+    // Time window constraints
+    for [c in 0...n] {
+        for [d in 0...n_days] {
+            allowed = false ;
+            for [a in j_de_livraison[c]] {
+                if (a==d) {
+                    allowed = true ;
+                }
+            }
+            if (!allowed) {
+                // println("Disallowing ", centres.rows[index_to_centre[c]+1][0]," on day ", d) ;
+                constraint sum[v in 0...m](visits_l[d][v][c]) == 0 ;
+            }
+        }
     }
 
     // Pickup each site enough times each week
     for [p in 0...n_pdr] {
         for [d in 0...n_days] {
 
-            // How many times do we have to pickup p on day d ? (it's either 1 or 0 as of now (01/23))
+            // How many times do we have to pickup p on day d ?
             n_ram = 0 ;
             for [j in j_de_ramasse[p]] {
                 if (j==d) {
                     n_ram += 1 ;
                 }
             }
-
             constraint sum[v in 1...m : frais[v] == "Oui"](visits_r[d][v][p]) == n_ram ; 
         }
     }
@@ -357,6 +385,7 @@ function write_solution() {
                         demi_palettes[d][v][node].value,
                         demi_palettes_s[d][v][node].value
                 };
+                place["norvegiennes"] = norvegiennes[d][v][node].value;
 
                 sol["tours"][key].add(place);
             }

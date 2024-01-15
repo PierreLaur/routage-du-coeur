@@ -34,7 +34,9 @@ def pretty_print_solution(file, week):
 
         output = ""
         output += f"- - - - - - TOURNEES SEMAINE {week} - - - - - -\n"
+        vehicles_used = {}
         for d in range(pb.n_days):
+            vehicles_used[d] = []
             if not any((d, v) in tours for v in range(pb.m)):
                 continue
 
@@ -44,6 +46,7 @@ def pretty_print_solution(file, week):
                     continue
 
                 output += f"\tVéhicule {v} ({vehicles.index[v]}) \n"
+                vehicles_used[d].append(vehicles.index[v])
                 tour = tours[d, v]
 
                 for place in tour:
@@ -59,15 +62,27 @@ def pretty_print_solution(file, week):
                                 product_types += f"{'':5}"
 
                         pals = place["palettes"]
-                        palettes = f"{pals[0]}P" if pals[0] else "  "
+                        palettes = f"{pals[0]}PA" if pals[0] else "   "
                         palettes += f" {pals[1]}/2PF" if pals[1] else "      "
                         palettes += f" {pals[2]}/2PS" if pals[2] else "      "
+                        palettes += (
+                            f" +{place['norvegiennes']} norvégienne{'s' if place['norvegiennes'] > 1 else ''}"
+                            if place["norvegiennes"]
+                            else ""
+                        )
                     else:
                         product_types = "Ramasse"
 
-                    output += f"\t\t{place['name']:35}\t{product_types}\t{palettes}\n"
+                    output += f"\t\t{place['name']:40}\t{product_types}\t{palettes}\n"
 
         output += f"\nDistance totale : {round(obj/1000):d}km"
+
+        print(vehicles_used)
+        vehicles_used = {
+            v: max(vehicles_used[d].count(v) for d in range(pb.n_days))
+            for v in vehicles.index
+        }
+        output += f"\nVéhicules utilisés : {' - '.join(f'{v} {k}' for k, v in vehicles_used.items())}"
 
         return output
 

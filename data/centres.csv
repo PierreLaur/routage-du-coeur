@@ -1,30 +1,30 @@
-Nom,Adresse,Jour Distribution,Heure Distribution,Tonnage Ambiant (kg),Tonnage Frais (kg),Tonnage Surgelé (kg),Semaine,Latitude,Longitude
-Toulouse/Seminaire,"27 Chemin du Séminaire, 31200 - Toulouse",Mercredi,,3643,1844,366,0,43.6391233,1.4356993
-Auterive,"23 Rue Anatole France, 31190 - Auterive",Jeudi,,115,89,0,0,43.3518938,1.479144
-Bagneres de Luchon,"Rue Laity, 31110 - Bagnères-de-Luchon",Vendredi,,78,250,35,1,42.7911527,0.5881116
-Bessieres,"192 Rue du Grand Pastellié, 31660 - Bessières",Mardi,,482,219,55,1,43.8006816,1.6040233
-Blagnac,"Impasse des Alouettes, 31700 - Blagnac",Jeudi,,609,373,86,0,43.6467573,1.3867645
-Carbonne,"56 Rue Lucien Cassagne, 31390 - Carbonne",Mardi,,305,126,23,0,43.2971934,1.2206374
-Cazeres,"Avenue de Labrioulette, 31220 - Cazères",Jeudi,,139,100,11,0,43.2103963,1.1059544
-Cugnaux,3 Rue de la Cressonnière Cugnaux,Jeudi,,616,393,86,2,43.5347748,1.3502449
-Escalquens,"13 Avenue de la Mairie, 31750 - Escalquens",Vendredi,,988,696,94,0,43.517648,1.5575128
-Fenouillet,"40 Rue Sévéso, 31150 - Fenouillet",Jeudi,,102,164,26,0,43.6848225,1.4029819
-Fonsorbes,"2758 Route de Tarbes, 31470 - Fonsorbes",Lundi,,448,249,65,1,43.5389381,1.2351879
-Fronton,Rue du 19 Mars 1962 Fronton,Jeudi,,448,249,65,1,43.8381611,1.3908275
-L Isle en Dodon,"Avenue des Martiagues, 31230 - L'Isle-en-Dodon",Mardi,,78,290,0,1,43.376577,0.8372039
-Leguevin,"1 Allee de Lattre de Tassigny, 31490 - Léguevin",Lundi,,170,105,28,0,43.599054,1.236362
-Levignac,"1 Rue du Docteur Monnerville, 31530 - Lévignac",Mardi,,147,174,27,2,43.66709549999999,1.1934514
-Montrejeau,"2 Rue Jeanne d'Arc, 31210 - Montréjeau",Jeudi,,85,92,6,0,43.0846413,0.5626481
-Muret,"13 b Rue Joseph Cugnot, 31600 - Muret",Jeudi,,253,377,67,0,43.47820900000001,1.341775
-Pibrac,"29 Rue du 19 Mars 1962, 31820 Pibrac",Mardi,,1411,887,273,0,43.6218265,1.2918542
-Plaisance du Touch,"5 Rue d'Estujats, 31830 - Plaisance-du-Touch",Lundi,,219,86,27,0,43.567516,1.3065979
-Portet sur Garonne,"Allée du Grand Chêne, 31120 - Portet-sur-Garonne",Jeudi,,635,238,89,0,43.5418696,1.4085209
-Revel,"60, rue Notre-Dame, 31250 - REVEL",Mercredi,,248,243,63,0,43.45654649999999,2.0037021
-Rieumes,"24 Place du Marche a la Volaille, 31370 - Rieumes",Jeudi,,285,259,55,2,43.4133038,1.1190482
-Saint-Gaudens,"8 Rue Alphonse de Lamartine, 31800 - Saint-Gaudens",Vendredi,,406,326,0,0,43.106199,0.7262609
-Salies du Salat/Mane,"15 Avenue du Comminges, 31260 - Mane",Mercredi,,285,259,55,0,43.0834612,0.9469247
-Toulouse/Grande-Bretagne(Casselardit),"268 Avenue de Grande Bretagne, 31300 - Toulouse",Vendredi,,613,773,152,0,43.60352750000001,1.4076353
-Toulouse/Malepere,"286 Route de Revel, 31400 - Toulouse",Mercredi,,4289,838,172,0,43.56513890000001,1.5106988
-Toulouse/Negogousses(Les Arenes),"63 Rue de Negogousses, 31100 - Toulouse",Jeudi,,1859,972,317,0,43.5928408,1.4113336
-Tournefeuille,"Route de Tarbes, 31170 - Tournefeuille",Mardi,,592,353,26,0,43.5771751,1.3259272
-Villefranche de Lauragais,"134, rue de la République, 31290 - VILLEFRANCHE DE LAURAGEAIS",Jeudi,,79,170,29,0,43.40153,1.7137495
+Nom,Adresse,Jour Distribution,Heure Distribution,Tonnage Ambiant (kg),Tonnage Frais (kg),Tonnage Surgelé (kg),Semaine,Latitude,Longitude,Jours de Livraison possibles,Jours de Livraison actuels
+Toulouse/Seminaire,"27 Chemin du Séminaire, 31200 - Toulouse",Mercredi,,3643,1844,366,0,43.6391233,1.4356993,,
+Auterive,"23 Rue Anatole France, 31190 - Auterive",Lundi/Jeudi,,115,89,0,0,43.3518938,1.479144,"Jeudi, Lundi",Jeudi
+Bagneres de Luchon,"Rue Laity, 31110 - Bagnères-de-Luchon",Vendredi,,78,250,35,1,42.7911527,0.5881116,"Mardi, Mercredi, Jeudi, Vendredi",Mardi
+Bessieres,"192 Rue du Grand Pastellié, 31660 - Bessières",Mardi,,482,219,55,1,43.8006816,1.6040233,"Lundi, Mardi",Mardi
+Blagnac,"Impasse des Alouettes, 31700 - Blagnac",Jeudi,,609,373,86,0,43.6467573,1.3867645,"Mardi, Mercredi, Jeudi",Jeudi
+Carbonne,"56 Rue Lucien Cassagne, 31390 - Carbonne",Mardi,,305,126,23,0,43.2971934,1.2206374,Lundi,Lundi
+Cazeres,"Avenue de Labrioulette, 31220 - Cazères",Mardi/Jeudi,,139,100,11,0,43.2103963,1.1059544,Mardi,Mardi
+Cugnaux,3 Rue de la Cressonnière Cugnaux,Jeudi,,616,393,86,2,43.5347748,1.3502449,"Mardi, Mercredi, Jeudi",Jeudi
+Escalquens,"13 Avenue de la Mairie, 31750 - Escalquens",Lundi/Vendredi,,988,696,94,0,43.517648,1.5575128,Vendredi,Vendredi
+Fenouillet,"40 Rue Sévéso, 31150 - Fenouillet",Jeudi,,102,164,26,0,43.6848225,1.4029819,"Mardi, Mercredi",Mardi
+Fonsorbes,"2758 Route de Tarbes, 31470 - Fonsorbes",Lundi,,448,249,65,1,43.5389381,1.2351879,Lundi,Lundi
+Fronton,Rue du 19 Mars 1962 Fronton,Jeudi,,448,249,65,1,43.8381611,1.3908275,"Mardi, Mercredi, Jeudi",Jeudi
+L Isle en Dodon,"Avenue des Martiagues, 31230 - L'Isle-en-Dodon",Mardi,,78,290,0,1,43.376577,0.8372039,"Lundi, Mardi",Lundi
+Leguevin,"1 Allee de Lattre de Tassigny, 31490 - Léguevin",Lundi,,170,105,28,0,43.599054,1.236362,"Jeudi, Vendredi",Jeudi
+Levignac,"1 Rue du Docteur Monnerville, 31530 - Lévignac",Mardi,,147,174,27,2,43.66709549999999,1.1934514,"Jeudi, Vendredi, Lundi",Jeudi
+Montrejeau,"2 Rue Jeanne d'Arc, 31210 - Montréjeau",Jeudi,,85,92,6,0,43.0846413,0.5626481,"Mardi, Mercredi, Jeudi",Mardi
+Muret,"13 b Rue Joseph Cugnot, 31600 - Muret",Mardi/Jeudi,,253,377,67,0,43.47820900000001,1.341775,Lundi,Lundi
+Pibrac,"29 Rue du 19 Mars 1962, 31820 Pibrac",Mardi,,1411,887,273,0,43.6218265,1.2918542,Lundi,Lundi
+Plaisance du Touch,"5 Rue d'Estujats, 31830 - Plaisance-du-Touch",Lundi,,219,86,27,0,43.567516,1.3065979,"Lundi, Vendredi",Lundi
+Portet sur Garonne,"Allée du Grand Chêne, 31120 - Portet-sur-Garonne",Mardi/Jeudi,,635,238,89,0,43.5418696,1.4085209,Lundi,Lundi
+Revel,"60, rue Notre-Dame, 31250 - REVEL",Mercredi,,248,243,63,0,43.45654649999999,2.0037021,"Lundi, Mardi",Lundi
+Rieumes,"24 Place du Marche a la Volaille, 31370 - Rieumes",Jeudi,,285,259,55,2,43.4133038,1.1190482,"Lundi, Mardi, Mercredi, Jeudi",Lundi
+Saint-Gaudens,"8 Rue Alphonse de Lamartine, 31800 - Saint-Gaudens",Mardi/Vendredi,,406,326,0,0,43.106199,0.7262609,Mardi,Mardi
+Salies du Salat/Mane,"15 Avenue du Comminges, 31260 - Mane",?,,285,259,55,0,43.0834612,0.9469247,Mardi,Mardi
+Toulouse/Grande-Bretagne(Casselardit),"268 Avenue de Grande Bretagne, 31300 - Toulouse",Vendredi,,613,773,152,0,43.60352750000001,1.4076353,Jeudi,Jeudi
+Toulouse/Malepere,"286 Route de Revel, 31400 - Toulouse",Lundi/Mardi/Mercredi,,4289,838,172,0,43.56513890000001,1.5106988,"Lundi, Mardi, Mercredi, Jeudi, Vendredi","Lundi,Mardi,Mercredi,Jeudi,Vendredi (?)"
+Toulouse/Negogousses(Les Arenes),"63 Rue de Negogousses, 31100 - Toulouse",Jeudi,,1859,972,317,0,43.5928408,1.4113336,"Lundi, Mardi, Mercredi, Vendredi","Lundi,Vendredi"
+Tournefeuille,"Route de Tarbes, 31170 - Tournefeuille",Mardi,,592,353,26,0,43.5771751,1.3259272,"Lundi, Mardi",Mardi
+Villefranche de Lauragais,"134, rue de la République, 31290 - VILLEFRANCHE DE LAURAGEAIS",Jeudi,,79,170,29,0,43.40153,1.7137495,"Mardi, Mercredi, Jeudi",Jeudi

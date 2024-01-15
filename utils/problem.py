@@ -12,12 +12,16 @@ class Problem:
     n_days: int
     demands: list[int]
     weights: list[int]
+    j_de_livraison_possibles: list[list[int]]
     j_de_ramasse: list[list[int]]
-    use_pl: set[tuple[int, int]]
     capacities: list[int]
     sizes: list[int]
     frais: list[bool]
     max_palette_capacity: int
+    demi_palette_capacity: int
+    n_norvegiennes: int
+    norvegienne_capacity: int
+    max_stops: int
 
 
 def read_problem(
@@ -36,7 +40,13 @@ def read_problem(
 
     capacities = vehicles["Capacité (kg)"].astype(int).tolist()
     sizes = vehicles["Taille(Palettes)"].astype(int).tolist()
+
     max_palette_capacity = 800
+    demi_palette_capacity = 0.45 * max_palette_capacity
+
+    max_stops = 4
+    norvegienne_capacity = 40
+    n_norvegiennes = 10
 
     demands = {
         "a": centres["Tonnage Ambiant (kg)"].fillna(0).astype(int).tolist(),
@@ -66,16 +76,20 @@ def read_problem(
     for d in demands.values():
         d[0] = 0
 
-    jours_de_ramasse = points_de_ramasse[f"Jours de Ramasse S{week}"].tolist()
-    j_de_ramasse = []
-    use_pl = set()
+    # Allowed delivery days
     jours_map = {"Lundi": 0, "Mardi": 1, "Mercredi": 2, "Jeudi": 3, "Vendredi": 4}
+    jours_de_livraison = centres["Jours de Livraison possibles"].tolist()
+    jours_de_livraison = [[]] + [j.split(", ") for j in jours_de_livraison[1:]]
+    j_de_livraison_possibles = [
+        list(map(lambda x: jours_map[x], j)) for j in jours_de_livraison
+    ]
+
+    # Mandatory pickup days
+    jours_de_ramasse = points_de_ramasse[f"Jours de Ramasse"].tolist()
+    j_de_ramasse = []
     for pdr in range(n_pdr):
         jours = jours_de_ramasse[pdr].split(", ")
         for i, j in enumerate(jours):
-            if "(PL)" in j:
-                jours[i] = jours[i].replace("(PL)", "")
-                use_pl.add((jours_map[jours[i]], pdr))
             jours[i] = jours_map[jours[i]]
         j_de_ramasse.append(jours)
 
@@ -89,12 +103,16 @@ def read_problem(
         n_days,
         demands,
         weights,
+        j_de_livraison_possibles,
         j_de_ramasse,
-        use_pl,
         capacities,
         sizes,
         frais,
         max_palette_capacity,
+        demi_palette_capacity,
+        n_norvegiennes,
+        norvegienne_capacity,
+        max_stops,
     )
 
     return problem
