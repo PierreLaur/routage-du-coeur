@@ -80,8 +80,13 @@ function input() {
         row = vehicles.rows[i];
         // Capacities in kg
         capacities[i] = row[1];
+        
         // Sizes in number of pallets
         sizes[i] = row[2];
+
+        // Fuel consumtion (L/100km)
+        fuel[i] = row[3];
+
         frais[i] = row[4];
         // frais[i] = "Oui";
     }
@@ -285,6 +290,7 @@ function model() {
                 constraint visits_l[d][v][c] * serve_s[d][v][c] <= 
                                 norvegiennes[d][v][c] * norvegienne_capacity +
                                 demi_palettes_s[d][v][c] * demi_palette_capacity ;
+                constraint demi_palettes_s[d][v][c] >= 0 ;
             } 
 
 
@@ -295,7 +301,7 @@ function model() {
             // Pickup capacity constraints
             constraint sum[p in 0...n_pdr](weight[p] * visits_r[d][v][p]) <= capacities[v];
             // We assume 2 palettes are used for each pickup
-            constraint sum[p in 0...n_pdr](2 * visits_r[d][v][p]) <= sizes[v];
+            constraint sum[p in 0...n_pdr](2 * visits_r[d][v][p]) <= sizes[v] ;
 
 
             // Deliver first, then pickup
@@ -324,7 +330,7 @@ function model() {
                         wait_at_pdrs * 60 * n_ramasses[d][v]
                         ;
 
-            constraint tour_duration[d][v] <= max_duration * 60;
+            constraint tour_duration[d][v] <= max_duration * 60 ;
             // constraint n_livraisons[d][v] + n_ramasses[d][v] <= 4;
         }
 
@@ -373,6 +379,7 @@ function model() {
     add_specific_requirements() ;
 
     total_distance <- sum[d in 0...n_days][v in 0...m](route_dist[d][v]);
+    // total_distance <- sum[d in 0...n_days][v in 0...m](route_dist[d][v] * fuel[v] / 100000);
 
     minimize total_distance;
 }

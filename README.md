@@ -9,7 +9,7 @@ Solve (requires Hexaly solver) :
 Solution checker :  
 ```python utils/solution_checker.py <solution file> <week number (1 or 2)```
 
-Print the solution to a file (extension must be txt, yaml or html):  
+Print the solution to a file :  
 ```python utils/plots.py <solution file> <week number (1 or 2) <output file>```
 
 [Example Solution](solutions/week_1.yaml)  

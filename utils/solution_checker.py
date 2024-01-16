@@ -113,7 +113,11 @@ def check_solution_file(
                             deliveries[d, v, c][2]
                             <= pb.demi_palette_capacity * palettes[d, v, c][2]
                             + norvegiennes[d, v, c] * pb.norvegienne_capacity
-                        )
+                        ), [
+                            deliveries[d, v, c][2],
+                            pb.demi_palette_capacity * palettes[d, v, c][2],
+                            norvegiennes[d, v, c] * pb.norvegienne_capacity,
+                        ]
 
                 # Size limit for each vehicle
                 assert (
