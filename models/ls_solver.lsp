@@ -378,10 +378,10 @@ function model() {
 
     add_specific_requirements() ;
 
-    total_distance <- sum[d in 0...n_days][v in 0...m](route_dist[d][v]);
-    // total_distance <- sum[d in 0...n_days][v in 0...m](route_dist[d][v] * fuel[v] / 100000);
+    // total_distance <- sum[d in 0...n_days][v in 0...m](route_dist[d][v]);
+    fuel_consumption <- sum[d in 0...n_days][v in 0...m](route_dist[d][v] * fuel[v] / 100000);
 
-    minimize total_distance;
+    minimize fuel_consumption;
 }
 
 function write_solution() {
@@ -389,7 +389,8 @@ function write_solution() {
     local outf = io.openWrite(outfile);
 
     sol = {};
-    sol["total_distance"] = total_distance.value;
+    sol["total_distance"] = sum[d in 0...n_days][v in 0...m](route_dist[d][v].value);
+    sol["fuel_consumption"] = fuel_consumption.value;
     sol["tours"] = {};
 
     for [d in 0...n_days] {
@@ -440,7 +441,7 @@ function write_solution() {
 }
 
 function set_current_tours() {
-    current_tours = json.parse("data/tours_tournees_actuelles_w1.json");
+    current_tours = json.parse("data/tours_tournees_actuelles_w" + week + ".json");
     for [d in 0...n_days] {
         for [v in 0...m] {
             key = "(" + d + ", " + v + ")" ;
@@ -477,7 +478,7 @@ function output(){
 
     write_solution();
 
-    println("\nTotal distance : ", total_distance.value/1000);
+    println("\nTotal distance : ", sum[d in 0...n_days][v in 0...m](route_dist[d][v].value)/1000);
 
 }
 
@@ -517,7 +518,7 @@ function main(args) {
         // set_initial_solution(true);
         // fix(0.4);
 
-        // set_current_tours();
+        set_current_tours();
 
         ls.model.close();
         if (timelimit != nil) {

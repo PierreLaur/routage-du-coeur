@@ -15,6 +15,7 @@ def check_solution_file(
     """Checks whether a solution file satisfies all constraints"""
     sol = json.load(open(solution_file))
     total_distance = sol["total_distance"]
+    fuel_consumption = sol["fuel_consumption"]
     tours = sol["tours"]
 
     pb = read_problem(
@@ -33,6 +34,7 @@ def check_solution_file(
     )
 
     obj = 0
+    distance = 0
     tours_flat = {}
     deliveries = {}
     palettes = {}
@@ -45,7 +47,8 @@ def check_solution_file(
                 tours_flat[d, v] = [0]
                 for place in tours[key]:
                     b = place["index"]
-                    obj += pb.matrix.iloc[a, b]
+                    distance += pb.matrix.iloc[a, b]
+                    obj += pb.matrix.iloc[a, b] * pb.consumptions[v]
                     tours_flat[d, v].append(b)
                     a = b
 
@@ -54,7 +57,8 @@ def check_solution_file(
                         palettes[d, v, b] = place["palettes"]
                         norvegiennes[d, v, b] = place["norvegiennes"]
 
-                obj += pb.matrix.iloc[a, 0]
+                distance += pb.matrix.iloc[a, 0]
+                obj += pb.matrix.iloc[a, 0] * pb.consumptions[v]
                 tours_flat[d, v].append(0)
 
                 # Only deliver frais with camions frigos
@@ -158,7 +162,8 @@ def check_solution_file(
         )
 
     # Check that the objective value is correct
-    assert obj == int(total_distance), [obj, total_distance]
+    assert obj / 100000 == fuel_consumption
+    assert distance == int(total_distance), [distance, total_distance]
 
     # Check that the number of pickups is correct for each day
     for p in range(pb.n_pdr):

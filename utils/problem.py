@@ -15,6 +15,7 @@ class Problem:
     j_de_livraison_possibles: list[list[int]]
     j_de_ramasse: list[list[int]]
     capacities: list[int]
+    consumptions: list[int]
     sizes: list[int]
     frais: list[bool]
     max_palette_capacity: int
@@ -39,6 +40,7 @@ def read_problem(
     m = len(vehicles.index)
 
     capacities = vehicles["Capacité (kg)"].astype(int).tolist()
+    consumptions = vehicles["Consommation (L/100km)"].astype(int).tolist()
     sizes = vehicles["Taille(Palettes)"].astype(int).tolist()
 
     max_palette_capacity = 800
@@ -106,6 +108,7 @@ def read_problem(
         j_de_livraison_possibles,
         j_de_ramasse,
         capacities,
+        consumptions,
         sizes,
         frais,
         max_palette_capacity,

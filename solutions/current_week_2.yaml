@@ -1,0 +1,201 @@
+Tournees Semaine 2:
+  Consommation totale: 258.13L
+  Distance totale: 2036km
+  Tournees:
+    Jeudi:
+      Camion Frigo 1:
+      - Livraison - Levignac AFS:
+          Palettes: '     1A  0.5F  0.5S'
+          Quantites: '  170A  201F   32S'
+      - Livraison - Toulouse/Malepere FS:
+          Palettes: '        1.5F  0.5S'
+          Quantites: '       797F  198S'
+      - Ramasse - Leclerc St Orens
+      - Ramasse - Super U Flourens
+      Camion Frigo 2:
+      - Livraison - Blagnac AFS:
+          Palettes: '     1A    1F  0.5S'
+          Quantites: '  422A  429F   99S'
+      - Ramasse - Leclerc Blagnac
+      Camion Frigo 3:
+      - Livraison - Toulouse/Grande-Bretagne(Casselardit) AFS:
+          Palettes: '     1A  1.5F  0.5S'
+          Quantites: '   23A  889F  175S'
+      Camion Frigo 4:
+      - Livraison - Cugnaux AFS:
+          Palettes: '     1A    1F  0.5S'
+          Quantites: '  709A  452F   99S'
+      Camion Frigo 5:
+      - Livraison - Pibrac FS:
+          Palettes: '        1.5F  0.5S'
+          Quantites: '      1021F  236S'
+      - Livraison - Leguevin AFS:
+          Palettes: '     1A  0.5F  0.5S'
+          Quantites: '    4A  121F    9S'
+      Camion Frigo 6:
+      - Livraison - Villefranche de Lauragais AFS:
+          Palettes: '     1A  0.5F  0.5S'
+          Quantites: '   91A  196F   34S'
+      - Livraison - Auterive AF:
+          Palettes: '     1A  0.5F     '
+          Quantites: '  133A  103F     '
+      Fourgon 1:
+      - Livraison - Leguevin AS:
+          Palettes: '     1A            +1 norvegienne'
+          Quantites: '  192A        32S'
+      Petit Poids Lourd 1:
+      - Livraison - Toulouse/Grande-Bretagne(Casselardit) A:
+          Palettes: '     1A          '
+          Quantites: '  691A          '
+      - Livraison - Blagnac A:
+          Palettes: '     1A          '
+          Quantites: '  674A          '
+    Lundi:
+      Camion Frigo 1:
+      - Livraison - Toulouse/Malepere AFS:
+          Palettes: '     2A  0.5F  0.5S'
+          Quantites: '  907A  133F  198S'
+      - Ramasse - Leclerc St Orens
+      - Ramasse - Super U Flourens
+      Camion Frigo 2:
+      - Livraison - Toulouse/Negogousses(Les Arenes) AFS:
+          Palettes: '     1A    2F  0.5S'
+          Quantites: '  179A 1117F  104S'
+      - Ramasse - Leclerc Blagnac
+      Camion Frigo 3:
+      - Ramasse - Leclerc Rouffiac
+      Camion Frigo 4:
+      - Livraison - Portet sur Garonne AFS:
+          Palettes: '     1A  0.5F  0.5S'
+          Quantites: '   42A  274F  103S'
+      - Livraison - Muret FS:
+          Palettes: '          1F  0.5S'
+          Quantites: '       434F   78S'
+      Camion Frigo 5:
+      - Livraison - Rieumes AFS:
+          Palettes: '     1A  0.5F  0.5S'
+          Quantites: '  328A  298F   64S'
+      Camion Frigo 6:
+      - Livraison - Plaisance du Touch AFS:
+          Palettes: '     1A  0.5F  0.5S'
+          Quantites: '  252A   99F   32S'
+      - Livraison - Carbonne AFS:
+          Palettes: '     1A  0.5F  0.5S'
+          Quantites: '  351A  145F   27S'
+      Camion Frigo 7:
+      - Livraison - Toulouse/Malepere AFS:
+          Palettes: '     1A  1.5F  0.5S'
+          Quantites: '   26A  964F   80S'
+      Petit Poids Lourd 1:
+      - Livraison - Portet sur Garonne A:
+          Palettes: '     1A          '
+          Quantites: '  689A          '
+      - Livraison - Muret A:
+          Palettes: '     1A          '
+          Quantites: '  291A          '
+      Poids Lourd 1:
+      - Livraison - Toulouse/Negogousses(Les Arenes) A:
+          Palettes: '     3A          '
+          Quantites: ' 1908A          '
+      - Livraison - Pibrac AS:
+          Palettes: '     3A            +2 norvegiennes'
+          Quantites: ' 1623A        80S'
+    Mardi:
+      Camion Frigo 1:
+      - Livraison - Toulouse/Malepere AFS:
+          Palettes: '     1A  1.5F  0.5S'
+          Quantites: '  442A  761F   96S'
+      - Ramasse - Leclerc St Orens
+      - Ramasse - Super U Flourens
+      Camion Frigo 2:
+      - Livraison - Montrejeau AFS:
+          Palettes: '     1A  0.5F  0.5S'
+          Quantites: '   53A  106F    7S'
+      - Livraison - Saint-Gaudens A:
+          Palettes: '     1A          '
+          Quantites: '  241A          '
+      - Livraison - Cazeres FS:
+          Palettes: '        0.5F  0.5S'
+          Quantites: '       115F   13S'
+      Camion Frigo 3:
+      - Livraison - Salies du Salat/Mane AFS:
+          Palettes: '     1A  0.5F  0.5S'
+          Quantites: '  241A  298F   64S'
+      - Livraison - Saint-Gaudens AF:
+          Palettes: '     1A    1F     '
+          Quantites: '  243A  375F     '
+      Camion Frigo 4:
+      - Livraison - Tournefeuille AFS:
+          Palettes: '     1A    1F  0.5S'
+          Quantites: '  681A  406F   30S'
+      Camion Frigo 5:
+      - Livraison - Fenouillet AFS:
+          Palettes: '     1A  0.5F  0.5S'
+          Quantites: '  118A  189F   30S'
+      Camion Frigo 6:
+      - Ramasse - Leclerc Rouffiac
+      Camion Frigo 7:
+      - Livraison - Revel AFS:
+          Palettes: '     1A  0.5F  0.5S'
+          Quantites: '  286A  280F   73S'
+      Poids Lourd 1:
+      - Livraison - Salies du Salat/Mane A:
+          Palettes: '     1A          '
+          Quantites: '   87A          '
+      - Livraison - Saint-Gaudens A:
+          Palettes: '     1A          '
+          Quantites: '  339A          '
+      - Livraison - Montrejeau A:
+          Palettes: '     1A          '
+          Quantites: '   81A          '
+      - Livraison - Cazeres A:
+          Palettes: '     1A          '
+          Quantites: '  160A          '
+    Mercredi:
+      Camion Frigo 1:
+      - Ramasse - Carrefour Supply Chain
+      Camion Frigo 2:
+      - Ramasse - Leclerc Rouffiac
+      Camion Frigo 3:
+      - Ramasse - Auchan Gramont
+      Camion Frigo 4:
+      - Livraison - Toulouse/Malepere AFS:
+          Palettes: '     1A  1.5F  0.5S'
+          Quantites: '  453A  879F   58S'
+      - Ramasse - Leclerc St Orens
+      - Ramasse - Super U Flourens
+      Poids Lourd 1:
+      - Ramasse - Carrefour Supply Chain
+    Vendredi:
+      Camion Frigo 1:
+      - Ramasse - Carrefour Supply Chain
+      Camion Frigo 2:
+      - Livraison - Toulouse/Negogousses(Les Arenes) AFS:
+          Palettes: '     1A  1.5F  0.5S'
+          Quantites: '  111A  853F  261S'
+      - Ramasse - Leclerc Blagnac
+      Camion Frigo 3:
+      - Ramasse - Leclerc Rouffiac
+      Camion Frigo 4:
+      - Livraison - Escalquens AFS:
+          Palettes: '     1A  1.5F  0.5S'
+          Quantites: '   10A  801F  108S'
+      - Livraison - Toulouse/Malepere FS:
+          Palettes: '        0.5F  0.5S'
+          Quantites: '       168F  192S'
+      - Ramasse - Auchan Gramont
+      Camion Frigo 5:
+      - Livraison - Escalquens AS:
+          Palettes: '     2A       0.5S'
+          Quantites: ' 1129A        90S'
+      Camion Frigo 6:
+      - Livraison - Toulouse/Malepere AFS:
+          Palettes: '     2A  0.5F  0.5S'
+          Quantites: ' 1336A   32F   32S'
+      - Ramasse - Leclerc St Orens
+      - Ramasse - Super U Flourens
+      Poids Lourd 1:
+      - Livraison - Toulouse/Malepere AS:
+          Palettes: '     6A            +1 norvegienne'
+          Quantites: ' 4431A        40S'
+  Vehicules: 1 Poids Lourd - 1 Petit Poids Lourd - 7 Camion Frigo - 1 Fourgon

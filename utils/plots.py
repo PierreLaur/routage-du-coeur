@@ -24,7 +24,8 @@ def print_to_yaml(file, week, output_file):
             week,
         )
 
-        obj = sol["total_distance"]
+        total_distance = sol["total_distance"]
+        fuel_consumption = sol["fuel_consumption"]
         tours_strkey = sol["tours"]
         tours = {}
 
@@ -100,7 +101,8 @@ def print_to_yaml(file, week, output_file):
 
         output = {
             f"Tournees Semaine {week}": {
-                "Distance totale": f"{round(obj/1000):d}km",
+                "Consommation totale": f"{fuel_consumption:.2f}L",
+                "Distance totale": f"{round(total_distance/1000):d}km",
                 "Vehicules": " - ".join(f"{v} {k}" for k, v in vehicles_used.items()),
                 "Tournees": days,
             }
@@ -127,7 +129,8 @@ def print_to_txt(file, week, output_file):
             week,
         )
 
-        obj = sol["total_distance"]
+        total_distance = sol["total_distance"]
+        fuel_consumption = sol["fuel_consumption"]
         tours_strkey = sol["tours"]
         tours = {}
 
@@ -168,8 +171,8 @@ def print_to_txt(file, week, output_file):
 
                         pals = place["palettes"]
                         palettes = f"{pals[0]}PA" if pals[0] else "   "
-                        palettes += f" {pals[1]}/2PF" if pals[1] else "      "
-                        palettes += f" {pals[2]}/2PS" if pals[2] else "      "
+                        palettes += f" {pals[1]/2:.1f}PF" if pals[1] else "      "
+                        palettes += f" {pals[2]/2:.1f}PS" if pals[2] else "      "
                         palettes += (
                             f" +{place['norvegiennes']} norvégienne{'s' if place['norvegiennes'] > 1 else ''}"
                             if place["norvegiennes"]
@@ -180,7 +183,8 @@ def print_to_txt(file, week, output_file):
 
                     output += f"\t\t{place['name']:40}\t{product_types}\t{palettes}\n"
 
-        output += f"\nDistance totale : {round(obj/1000):d}km"
+        output += f"\nConsommation totale : {fuel_consumption:.2f}L"
+        output += f"\nDistance totale : {round(total_distance/1000):d}km"
 
         vehicles_used = {
             v: max(vehicles_used[d].count(v) for d in range(pb.n_days))
