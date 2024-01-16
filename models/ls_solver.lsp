@@ -13,11 +13,18 @@ function input() {
     max_palette_capacity = 800 ;
     demi_palette_capacity = 0.45 * max_palette_capacity ;
     
-    max_stops = 4 ;
     norvegienne_capacity = 40 ;
     n_norvegiennes = 10 ;
+
+    // The coefficients of the linear proxy for tour duration
+    // Determined in fit_duration_proxy.ipynb
+    duration_coefficients = {0.0435, 560.0} ;
+    wait_at_centres = 15 ; // in minutes
+    wait_at_pdrs = 40 ;
+    max_duration = 230 ; // in minutes
     
     centres = csv.parse("data/centres.csv");
+    // centres = csv.parse("data/centres_good_assignment.csv");
     pdr = csv.parse("data/points_de_ramasse.csv");
     matrix = csv.parse("data/euclidean_matrix.csv");
     vehicles = csv.parse("data/vehicules.csv");
@@ -172,7 +179,6 @@ function set_initial_solution(force, specific_vd) {
                         constraint livraisons[d][v][i] == index;
                         constraint visits_l[d][v][index] == 1 ;
                         i += 1 ;
-                        constraint demi_palettes_s[d][v][index] == place["palettes"][2];
                         constraint norvegiennes[d][v][index] == place["norvegiennes"];
                         constraint serve_a[d][v][index] >= place["delivery"][0] ;
                         constraint serve_f[d][v][index] >= place["delivery"][1] ;
@@ -188,7 +194,6 @@ function set_initial_solution(force, specific_vd) {
                         }
 
                         if (frais[v] == "Oui") {
-                            demi_palettes_s[d][v][index].value = place["palettes"][2];
                             if (place["delivery"][1] > demands["f"][index]) {
                                 serve_f[d][v][index].value = 0;
                             } else {
@@ -269,8 +274,13 @@ function model() {
                 palettes[d][v][c] <- ceil(visits_l[d][v][c] * serve_a[d][v][c] / max_palette_capacity) ;
                 demi_palettes[d][v][c] <- ceil(visits_l[d][v][c] * serve_f[d][v][c] / demi_palette_capacity);
 
-                demi_palettes_s[d][v][c] <- frais[v] == "Oui" ? int(0, sizes[v]) : 0;
                 norvegiennes[d][v][c] <- int(0, n_norvegiennes);
+                demi_palettes_s[d][v][c] <- frais[v] == "Oui" ? 
+                                    ceil(
+                                        (visits_l[d][v][c] * serve_s[d][v][c] - 
+                                        norvegiennes[d][v][c] * norvegienne_capacity) / demi_palette_capacity
+                                        ) : 
+                                    0;
 
                 constraint visits_l[d][v][c] * serve_s[d][v][c] <= 
                                 norvegiennes[d][v][c] * norvegienne_capacity +
@@ -287,11 +297,11 @@ function model() {
             // We assume 2 palettes are used for each pickup
             constraint sum[p in 0...n_pdr](2 * visits_r[d][v][p]) <= sizes[v];
 
+
             // Deliver first, then pickup
             route_dist[d][v] <- 
-                + (liv ? dist_from_depot[livraisons[d][v][0]] 
-                        + sum(1...n_livraisons[d][v], i => dist_matrix[livraisons[d][v][i - 1]][livraisons[d][v][i]]) 
-                        
+                + (liv ?  dist_from_depot[livraisons[d][v][0]] 
+                        + sum(1...n_livraisons[d][v], i => dist_matrix[livraisons[d][v][i - 1]][livraisons[d][v][i]])
                         + (ram ? 
                             dist_matrix[livraisons[d][v][n_livraisons[d][v]-1]][ramasses[d][v][0] + n]
                             : dist_to_depot[livraisons[d][v][n_livraisons[d][v]-1]])
@@ -301,8 +311,21 @@ function model() {
                         + sum(1...n_ramasses[d][v], i => dist_matrix[ramasses[d][v][i - 1] + n][ramasses[d][v][i] + n])
                 ;
 
-            // Max number of stops in a single trip
-            constraint n_livraisons[d][v] + n_ramasses[d][v] <= max_stops ;
+            // Constrain the estimated tour duration
+            // Based on a linear proxy from the tour length
+            // See fit_duration_proxy.ipynb
+            tour_duration[d][v] <- 
+                        duration_coefficients[0] * 
+                                (route_dist[d][v] - (ram ? 
+                                    dist_to_depot[ramasses[d][v][n_ramasses[d][v]-1] + n] : 
+                                    (liv ? dist_to_depot[livraisons[d][v][n_livraisons[d][v]-1]] : 0))) + 
+                        duration_coefficients[1] + 
+                        wait_at_centres * 60 * n_livraisons[d][v] +
+                        wait_at_pdrs * 60 * n_ramasses[d][v]
+                        ;
+
+            constraint tour_duration[d][v] <= max_duration * 60;
+            // constraint n_livraisons[d][v] + n_ramasses[d][v] <= 4;
         }
 
         constraint sum[c in 0...n][v in 0...m](norvegiennes[d][v][c]) <= n_norvegiennes ;
@@ -387,7 +410,8 @@ function write_solution() {
                         demi_palettes[d][v][node].value,
                         demi_palettes_s[d][v][node].value
                 };
-                place["norvegiennes"] = norvegiennes[d][v][node].value;
+                place["norvegiennes"] = serve_s[d][v][node].value > demi_palettes_s[d][v][node].value * demi_palette_capacity ? 
+                                            norvegiennes[d][v][node].value : 0;
 
                 sol["tours"][key].add(place);
             }
@@ -406,6 +430,40 @@ function write_solution() {
         }
     }
     json.dump(sol, outf);
+}
+
+function set_current_tours() {
+    current_tours = json.parse("data/tours_tournees_actuelles_w1.json");
+    for [d in 0...n_days] {
+        for [v in 0...m] {
+            key = "(" + d + ", " + v + ")" ;
+            if (current_tours[key] == nil) continue;
+            init_liv = {} ;
+            init_ram = {} ;
+            i = 0 ;
+            j = 0 ;
+            for [k in 1...current_tours[key].count()-1] {
+                for [c in 0...n] {
+                    if (index_to_centre[c] == current_tours[key][k] - 1) {
+                        constraint livraisons[d][v][i] == c;
+                        i += 1 ;
+                        // init_liv.add(c);
+                        break;
+                    }
+                }
+                for [p in 0...n_pdr] {
+                    if (p + n_centres == current_tours[key][k]) {
+                        constraint ramasses[d][v][j] == p;
+                        j += 1 ;
+                        // init_ram.add(p);
+                        break;
+                    }
+                }
+            }
+            constraint n_livraisons[d][v] == i;
+            constraint n_ramasses[d][v] == j;
+        }
+    }
 }
 
 function output(){
@@ -451,6 +509,8 @@ function main(args) {
 
         // set_initial_solution(true);
         // fix(0.4);
+
+        // set_current_tours();
 
         ls.model.close();
         if (timelimit != nil) {

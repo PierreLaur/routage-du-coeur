@@ -221,9 +221,9 @@ def plot_solution(file, week, output_file):
             "purple",
             "green",
             "darkgreen",
-            "beige",
-            "beige",
-            "beige",
+            "white",
+            "white",
+            "white",
         ]
 
         lats = centres["Latitude"].tolist() + pdr["Latitude"].tolist()
@@ -304,13 +304,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    extension = args.outfile.split(".")[-1]
+    file_name = args.outfile.split(".")[0]
 
-    if extension == "html":
-        plot_solution(args.infile, args.week, args.outfile)
-    elif extension == "txt":
-        print_to_txt(args.infile, args.week, args.outfile)
-    elif extension == "yaml":
-        print_to_yaml(args.infile, args.week, args.outfile)
-    else:
-        print("File extension must be html, txt or yaml")
+    plot_solution(args.infile, args.week, file_name + ".html")
+    print_to_txt(args.infile, args.week, file_name + ".txt")
+    print_to_yaml(args.infile, args.week, file_name + ".yaml")

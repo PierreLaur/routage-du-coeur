@@ -52,21 +52,23 @@ def bench_assignments():
         for week in [1, 2]:
             print("\n- - - - - - - - WEEK ", week, "\n")
 
+            file_name = f"overnight/assignment{index}week{week}.json"
             process = Popen(
                 [
                     "localsolver",
                     "models/ls_solver.lsp",
+                    # f"solutions/week_{week}.json",
                     "nil",
-                    f"solutions/temp{week}.json",
+                    file_name,
                     f"{week}",
-                    "58",
+                    "98",
                 ],
                 stderr=PIPE,
                 stdout=PIPE,
             )
 
             st = time()
-            while time() - st < 60:
+            while time() - st < 100:
                 output = process.stdout.readline()
                 if output == "" and process.poll() is not None:
                     break

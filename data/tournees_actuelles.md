@@ -69,6 +69,7 @@ METRO
 16.6km
 
 Bessieres
+Leclerc Rouffiac
 62.6km
 
 ## Mercredi
@@ -90,9 +91,6 @@ Carrefour Supply Chain
 
 Carrefour Supply Chain
 39km
-
-Leclerc Rouffiac
-18.1km
 
 ## Jeudi
 

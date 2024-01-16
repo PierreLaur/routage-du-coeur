@@ -14,5 +14,5 @@ Print the solution to a file (extension must be txt, yaml or html):
 
 [Example Solution](solutions/week_1.yaml)  
   
-Example Plot :  
+Example (partial) Plot :  
 ![tours plot example](solutions/tours.jpg)

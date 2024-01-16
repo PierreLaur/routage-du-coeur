@@ -1,6 +1,7 @@
 import json
 import sys
 from problem import Problem, read_problem
+import pandas as pd
 
 
 def check_solution_file(
@@ -22,6 +23,13 @@ def check_solution_file(
         vehicles_file,
         matrix_file,
         week,
+    )
+
+    duration_matrix = pd.read_excel("data/duration_matrix.xlsx", index_col=0)
+    wait_at_centres = 15  # minutes
+    wait_at_pdrs = 40  # minutes
+    warning_duration_threshold = (
+        180  # Show a warning if estimated duration for a tour is higher than this
     )
 
     obj = 0
@@ -118,6 +126,20 @@ def check_solution_file(
                     <= pb.sizes[v]
                 )
 
+                estimated_duration = sum(
+                    duration_matrix.iloc[a, b]
+                    for a, b in zip(tours_flat[d, v][:-2], tours_flat[d, v][1:-1])
+                ) / 60 + sum(
+                    wait_at_centres if c < pb.n else wait_at_pdrs
+                    for c in tours_flat[d, v][1:-1]
+                )
+
+                if estimated_duration > warning_duration_threshold:
+                    print(
+                        f"Warning : tour {key} is ~{estimated_duration//60:.0f}h{estimated_duration%60:.0f}min long :",
+                        [duration_matrix.index[c] for c in tours_flat[d, v][1:-1]],
+                    )
+
     for d in range(pb.n_days):
         # Don't use too many norvegiennes
         assert (
@@ -136,8 +158,8 @@ def check_solution_file(
 
     # Check that the number of pickups is correct for each day
     for p in range(pb.n_pdr):
+        node = pb.n + p
         for d in range(pb.n_days):
-            node = pb.n + p
             n_visits = sum(
                 [
                     tours_flat[d, v].count(node)
