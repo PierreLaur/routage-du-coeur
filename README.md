@@ -9,10 +9,11 @@ Solve (requires Hexaly solver) :
 Solution checker :  
 ```python utils/solution_checker.py <solution file> <week number (1 or 2)```
 
-Print the solution to a file :  
+Print the solution as txt + yaml + html interactive map :  
 ```python utils/plots.py <solution file> <week number (1 or 2) <output file>```
 
 [Example Solution](solutions/week_1.yaml)  
+[Example html](solutions/week_1.html)  
   
 Example (partial) Plot :  
 ![tours plot example](solutions/tours.jpg)
