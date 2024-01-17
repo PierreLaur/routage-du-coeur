@@ -1,11 +1,280 @@
 import pandas as pd
-import plotly.graph_objects as go
 import sys
 import json
 from problem import Problem, read_problem
 import folium
 import yaml
 import argparse
+from dash import Dash, html, dcc
+import dash_bootstrap_components as dbc
+
+
+def make_dashboard(file, week, output_file):
+    def create_tour_card(name, tour):
+        card_items = []
+
+        for item in tour:
+            if isinstance(item, dict):
+                tour_key, tour_info = list(item.items())[0]
+                palettes, quantities = tour_info["Palettes"], tour_info["Quantites"]
+                card_items.append(
+                    html.Tr(
+                        [
+                            html.Td(
+                                html.B(f"{tour_key}"),
+                                style={
+                                    "width": "50%",
+                                    "background-color": "#f0f0f0",
+                                },
+                            ),
+                            html.Td(
+                                dbc.Table(
+                                    [
+                                        html.Tr(
+                                            [
+                                                html.Td(
+                                                    f"Palettes",
+                                                    style={
+                                                        "width": "31%",
+                                                        "padding": "0 0px 0 5px",
+                                                    },
+                                                ),
+                                                *[
+                                                    html.Td(p, style={"width": "23%"})
+                                                    for p in palettes.split()
+                                                ],
+                                            ]
+                                        ),
+                                        html.Tr(
+                                            [
+                                                html.Td(
+                                                    f"Quantités",
+                                                    style={
+                                                        "width": "31%",
+                                                        "padding": "0 0px 0 5px",
+                                                    },
+                                                ),
+                                                *[
+                                                    html.Td(q, style={"width": "23%"})
+                                                    for q in quantities.split()
+                                                ],
+                                            ]
+                                        ),
+                                    ],
+                                    size="sm",
+                                    style={"font-family": "monospace", "margin": "0"},
+                                ),
+                                style={
+                                    "padding": "0",
+                                    "background-color": "#f0f0f0",
+                                },
+                            ),
+                        ],
+                        style={
+                            "margin": "0",
+                            "padding": "0",
+                        },
+                    )
+                )
+            else:
+                card_items.append(
+                    html.Tr(
+                        [
+                            html.Td(
+                                html.B(item), style={"width": "50%", "height": "100%"}
+                            ),
+                            html.Td("", style={"width": "50%", "height": "100%"}),
+                        ],
+                        style={"height": "100%"},
+                    )
+                )
+
+        return dbc.Card(
+            dbc.Row(
+                [
+                    dbc.Col(
+                        html.B(
+                            f"{name}", style={"margin": "0 0 0 3px", "padding": "0"}
+                        ),
+                        style={
+                            "display": "flex",
+                            "alignItems": "center",
+                            "text-align": "center",
+                            "max-width": "10%",
+                            "min-height": "100%",
+                        },
+                    ),
+                    dbc.Col(
+                        dbc.Table(
+                            html.Tbody(card_items, style={"min-height": "100%"}),
+                            bordered=True,
+                            size="sm",
+                            style={
+                                "margin": "0",
+                                "overflow": "hidden",
+                                "min-width": "90%",
+                                "min-height": "100%",
+                            },
+                        ),
+                    ),
+                ],
+            ),
+            style={
+                "margin": "0px 1% 5px 1%",
+                "width": "98%",
+                "border": "1px solid black",
+                "overflow": "hidden",
+            },
+        )
+
+    def create_map(day):
+        return (
+            html.Iframe(
+                srcDoc=open(f"solutions/test_{day}.html", "r").read(),
+                style={
+                    "height": "100%",
+                    "width": "100%",
+                    "border": "1px solid black",
+                },
+            ),
+        )
+
+    app = Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
+
+    data = yaml.safe_load(open(file))[f"Tournees Semaine {week}"]
+
+    days = []
+    day_names = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi"]
+    for day in day_names:
+        vehicules = []
+        for k, v in data["Tournees"][day].items():
+            card = create_tour_card(k, v)
+            vehicules.append(card)
+        days.append(
+            [
+                html.H5(
+                    children=f"{day}",
+                    style={"text-align": "center", "font-weight": "bold"},
+                ),
+                *vehicules,
+            ]
+        )
+
+    plot_solution("solutions/week_1.json", 1, "solutions/test_2.html", 1)
+
+    app.layout = html.Div(
+        [
+            dbc.Row(
+                [
+                    dbc.Col(
+                        days[0],
+                        width=4,
+                        style={
+                            # "border": "1px solid #ddd",
+                            "padding": "0px"
+                        },
+                    ),
+                    dbc.Col(
+                        days[1],
+                        width=4,
+                        style={
+                            # "border": "1px solid #ddd",
+                            "padding": "0px"
+                        },
+                    ),
+                    dbc.Col(
+                        days[2],
+                        width=4,
+                        style={
+                            # "border": "1px solid #ddd",
+                            "padding": "0px"
+                        },
+                    ),
+                ],
+                className="grid-container",
+                style={"height": "30%", "margin": "0px"},
+            ),
+            dbc.Row(
+                [
+                    dbc.Col(
+                        create_map(1),
+                        width=4,
+                        style={"margin": "0px", "padding": "0px"},
+                    ),
+                    dbc.Col(
+                        create_map(2),
+                        width=4,
+                        style={"margin": "0px", "padding": "0px"},
+                    ),
+                    dbc.Col(
+                        create_map(1),
+                        width=4,
+                        style={"margin": "0px", "padding": "0px"},
+                    ),
+                ],
+                style={"height": "20%", "margin": "0px"},
+            ),
+            dbc.Row(
+                [
+                    dbc.Col(
+                        days[3],
+                        width=4,
+                        style={
+                            # "border": "1px solid #ddd",
+                            "padding": "0px",
+                        },
+                    ),
+                    dbc.Col(
+                        days[4],
+                        width=4,
+                        style={
+                            # "border": "1px solid #ddd",
+                            "padding": "0px",
+                        },
+                    ),
+                    dbc.Col(
+                        "infos",
+                        width=4,
+                        style={
+                            # "border": "1px solid #ddd",
+                            "padding": "0px",
+                        },
+                    ),
+                ],
+                className="grid-container",
+                style={"height": "30%", "margin": "0px"},
+            ),
+            dbc.Row(
+                [
+                    dbc.Col(
+                        create_map(1),
+                        width=4,
+                        style={"margin": "0px", "padding": "0px"},
+                    ),
+                    dbc.Col(
+                        create_map(1),
+                        width=4,
+                        style={"margin": "0px", "padding": "0px"},
+                    ),
+                    dbc.Col(
+                        "",
+                        width=4,
+                        style={"margin": "0px", "padding": "0px"},
+                    ),
+                ],
+                style={"height": "20%", "margin": "0px"},
+            ),
+        ],
+        style={
+            "height": "2100px",
+            "width": "1485px",
+            "margin": "10px",
+            "padding": "0",
+            "fontSize": 11,
+            "border": "1px solid black",
+        },
+    )
+    app.run(debug=True)
 
 
 def print_to_yaml(file, week, output_file):
@@ -34,6 +303,43 @@ def print_to_yaml(file, week, output_file):
             tours[d, v] = tour
 
         jours_map = {0: "Lundi", 1: "Mardi", 2: "Mercredi", 3: "Jeudi", 4: "Vendredi"}
+        names_short = [
+            "Toulouse/Seminaire",
+            "Auterive",
+            "Bagneres de Luchon",
+            "Bessieres",
+            "Blagnac",
+            "Carbonne",
+            "Cazeres",
+            "Cugnaux",
+            "Escalquens",
+            "Fenouillet",
+            "Fonsorbes",
+            "Fronton",
+            "L Isle en Dodon",
+            "Leguevin",
+            "Levignac",
+            "Montrejeau",
+            "Muret",
+            "Pibrac",
+            "Plaisance du Touch",
+            "Portet sur Garonne",
+            "Revel",
+            "Rieumes",
+            "Saint-Gaudens",
+            "Salies du Salat/Mane",
+            "Toulouse/Casselardit",
+            "Toulouse/Malepere",
+            "Toulouse/Negogousses",
+            "Tournefeuille",
+            "Villef. de Lauragais",
+            "Auchan Gramont",
+            "Leclerc St Orens",
+            "Super U Flourens",
+            "Leclerc Blagnac",
+            "Leclerc Rouffiac",
+            "Carrefour Centrale",
+        ]
 
         vehicles_used = {}
         days = {}
@@ -79,7 +385,7 @@ def print_to_yaml(file, week, output_file):
                         )
                         tour_list.append(
                             {
-                                f"Livraison - {place['name']} {product_types}": {
+                                f"Livraison - {names_short[place['index']]} {product_types}": {
                                     "Quantites": quantities,
                                     "Palettes": palettes,
                                 }
@@ -87,7 +393,7 @@ def print_to_yaml(file, week, output_file):
                         )
                     else:
                         tour_list.append(
-                            f"Ramasse - {place['name']}",
+                            f"Ramasse - {names_short[place['index']]}",
                         )
 
                 days[jours_map[d]][
@@ -197,7 +503,7 @@ def print_to_txt(file, week, output_file):
         print(output)
 
 
-def plot_solution(file, week, output_file):
+def plot_solution(file, week, output_file, specific_day=None):
     """Makes a folium plot of the solution and saves it to a specified file"""
     with open(file) as f:
         sol = json.load(f)
@@ -243,6 +549,7 @@ def plot_solution(file, week, output_file):
             tours[d, v] = tour
 
         m = folium.Map(
+            tiles="CartoDB Positron",
             location=(lats[0], longs[0]),
             max_bounds=True,
             min_lat=min(lats) - 0.5,
@@ -255,20 +562,21 @@ def plot_solution(file, week, output_file):
 
         # Add the centres and points de ramasse as markers
         for i in range(len(centres)):
-            folium.Marker(
+            folium.CircleMarker(
                 location=(lats[i], longs[i]),
                 tooltip=centres["Nom"][i],
-                icon=folium.Icon(color="green" if i == 0 else "red"),
+                color="green" if i == 0 else "red",
             ).add_to(m)
         for i in range(len(pdr)):
-            folium.Marker(
+            folium.CircleMarker(
                 location=(lats[pb.n + i], longs[pb.n + i]),
                 tooltip=pdr["Nom"][i],
-                icon=folium.Icon(color="blue"),
+                color="blue",
             ).add_to(m)
 
         vehicles_used = {}
-        for d in range(pb.n_days):
+        days_to_plot = [specific_day] if specific_day is not None else range(pb.n_days)
+        for d in days_to_plot:
             vehicles_used[d] = []
             if not any((d, v) in tours for v in range(pb.m)):
                 continue
@@ -299,17 +607,20 @@ def plot_solution(file, week, output_file):
         m.save(output_file)
         print("Map saved to ", output_file)
 
+        return m
+
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("infile", type=str, help="json solution file")
-    parser.add_argument("week", type=int, help="week number (1 or 2)")
-    parser.add_argument("outfile", type=str, help="desired output file path")
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("infile", type=str, help="json solution file")
+    # parser.add_argument("week", type=int, help="week number (1 or 2)")
+    # parser.add_argument("outfile", type=str, help="desired output file path")
 
-    args = parser.parse_args()
+    # args = parser.parse_args()
 
-    file_name = args.outfile.split(".")[0]
+    # file_name = args.outfile.split(".")[0]
 
-    plot_solution(args.infile, args.week, file_name + ".html")
-    print_to_txt(args.infile, args.week, file_name + ".txt")
-    print_to_yaml(args.infile, args.week, file_name + ".yaml")
+    # plot_solution(args.infile, args.week, file_name + ".html")
+    # print_to_txt(args.infile, args.week, file_name + ".txt")
+    # print_to_yaml(args.infile, args.week, file_name + ".yaml")
+    make_dashboard("solutions/week_1.yaml", 1, "dashboard.html")

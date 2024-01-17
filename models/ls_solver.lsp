@@ -84,7 +84,7 @@ function input() {
         // Sizes in number of pallets
         sizes[i] = row[2];
 
-        // Fuel consumtion (L/100km)
+        // Fuel consumption (L/100km)
         fuel[i] = row[3];
 
         frais[i] = row[4];
@@ -331,23 +331,25 @@ function model() {
                         ;
 
             constraint tour_duration[d][v] <= max_duration * 60 ;
-            // constraint n_livraisons[d][v] + n_ramasses[d][v] <= 4;
+            constraint n_livraisons[d][v] + n_ramasses[d][v] <= 4; // This is basically redundant
         }
 
         constraint sum[c in 0...n][v in 0...m](norvegiennes[d][v][c]) <= n_norvegiennes ;
 
     }
 
+
+
     // Time window constraints
     for [c in 0...n] {
         for [d in 0...n_days] {
-            allowed = false ;
+            allowed[d][c] = false ;
             for [a in j_de_livraison[c]] {
                 if (a==d) {
-                    allowed = true ;
+                    allowed[d][c] = true ;
                 }
             }
-            if (!allowed) {
+            if (!allowed[d][c]) {
                 // println("Disallowing ", centres.rows[index_to_centre[c]+1][0]," on day ", d) ;
                 constraint sum[v in 0...m](visits_l[d][v][c]) == 0 ;
             }
@@ -381,7 +383,17 @@ function model() {
     // total_distance <- sum[d in 0...n_days][v in 0...m](route_dist[d][v]);
     fuel_consumption <- sum[d in 0...n_days][v in 0...m](route_dist[d][v] * fuel[v] / 100000);
 
-    minimize fuel_consumption;
+    // used[v in 0...m] <- sum[d in 0...n_days](n_livraisons[d][v] + n_ramasses[d][v]) > 0 ;
+    // minimize sum[v in 0...m](used[v]);
+    // constraint sum[v in 0...m](used[v]) <= 6;
+
+    // for [v in 3...9] {
+    //     constraint used[v] <= used[v-1] ;
+    // }
+    
+
+    minimize fuel_consumption ;
+
 }
 
 function write_solution() {
@@ -479,6 +491,7 @@ function output(){
     write_solution();
 
     println("\nTotal distance : ", sum[d in 0...n_days][v in 0...m](route_dist[d][v].value)/1000);
+    println("Total fuel consumption : ", fuel_consumption.value);
 
 }
 
@@ -518,7 +531,7 @@ function main(args) {
         // set_initial_solution(true);
         // fix(0.4);
 
-        set_current_tours();
+        // set_current_tours();
 
         ls.model.close();
         if (timelimit != nil) {

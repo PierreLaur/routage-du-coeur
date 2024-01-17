@@ -61,14 +61,14 @@ def bench_assignments():
                     "nil",
                     file_name,
                     f"{week}",
-                    "98",
+                    "18",
                 ],
                 stderr=PIPE,
                 stdout=PIPE,
             )
 
             st = time()
-            while time() - st < 100:
+            while time() - st < 20:
                 output = process.stdout.readline()
                 if output == "" and process.poll() is not None:
                     break
@@ -77,7 +77,7 @@ def bench_assignments():
                     if "%" not in line:
                         print(line)
 
-            res[week] = float(line.split("Total distance : ")[1])
+            res[week] = float(line.split("Total fuel consumption : ")[1])
 
         res_week1.append(res[1])
         res_week2.append(res[2])
