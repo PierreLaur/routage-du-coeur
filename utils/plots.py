@@ -611,16 +611,16 @@ def plot_solution(file, week, output_file, specific_day=None):
 
 
 if __name__ == "__main__":
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument("infile", type=str, help="json solution file")
-    # parser.add_argument("week", type=int, help="week number (1 or 2)")
-    # parser.add_argument("outfile", type=str, help="desired output file path")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("infile", type=str, help="json solution file")
+    parser.add_argument("week", type=int, help="week number (1 or 2)")
+    parser.add_argument("outfile", type=str, help="desired output file path")
 
-    # args = parser.parse_args()
+    args = parser.parse_args()
 
-    # file_name = args.outfile.split(".")[0]
+    file_name = args.outfile.split(".")[0]
 
-    # plot_solution(args.infile, args.week, file_name + ".html")
-    # print_to_txt(args.infile, args.week, file_name + ".txt")
-    # print_to_yaml(args.infile, args.week, file_name + ".yaml")
-    make_dashboard("solutions/week_1.yaml", 1, "dashboard.html")
+    plot_solution(args.infile, args.week, file_name + ".html")
+    print_to_txt(args.infile, args.week, file_name + ".txt")
+    print_to_yaml(args.infile, args.week, file_name + ".yaml")
+    # make_dashboard("solutions/week_1.yaml", 1, "dashboard.html")
