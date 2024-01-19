@@ -65,19 +65,23 @@ function input() {
     }
 
     // Demands
-    for [i in 0...n] {
-        centre = index_to_centre[i] ;
-        demands["a"][i] = ceil(centres.rows[centre+1][4] * 1.15); 
-        demands["f"][i] = ceil(centres.rows[centre+1][5] * 1.15); // Add 15% for robustness
-        demands["s"][i] = ceil(centres.rows[centre+1][6] * 1.15);
+    rng = random.create() ;
+    n_scenarios = 15 ;
+    for [s in 0...n_scenarios] {
+        for [i in 0...n] {
+            centre = index_to_centre[i] ;
+            demands["a"][s][i] = ceil(centres.rows[centre+1][4] * (1 + rng.nextNormal(0, 0.3))); 
+            demands["f"][s][i] = ceil(centres.rows[centre+1][5] * (1 + rng.nextNormal(0, 0.3))); // Add 15% for robustness
+            demands["s"][s][i] = ceil(centres.rows[centre+1][6] * (1 + rng.nextNormal(0, 0.3)));
 
-        /* 
-        Note : if the demand is normal, we can enforce demand constraints satisfied 95% of the time by
-            setting the demand to mu + Ksigma
-            with K = Q0.975 = 1.645
-            if sigma = X% of mu, this is mu(1 + KX)
-        */
+            /* 
+            Note : if the demand is normal, we can enforce demand constraints satisfied 95% of the time by
+                setting the demand to mu + Ksigma
+                with K = Q0.975 = 1.645
+                if sigma = X% of mu, this is mu(1 + KX)
+            */
 
+        }
     }
 
     // Pickup weights (per pickup)
@@ -149,10 +153,10 @@ function model() {
 
     // Deliver quantity for each product type (ambiant/frais/surgelé)
     // We don't actually use trucks 1 and >=7
-    serve_a[d in 0...n_days][v in 0...m][c in 0...n] <-         (v == 1 || v >= 6) ? 0 : int(0, demands["a"][c]) ;
+    serve_a[d in 0...n_days][v in 0...m][c in 0...n] <-         (v == 1 || v >= 6) ? 0 : int(0, max[s in 0...n_scenarios](demands["a"][s][c])) ;
     serve_f[d in 0...n_days][v in 0...m][c in 0...n] <-         (v == 1 || v >= 6) ? 0 : 
-                                                                    (frais[v] == "Oui" ? int(0, demands["f"][c]) : 0) ;
-    serve_s[d in 0...n_days][v in 0...m][c in 0...n] <-         (v == 1 || v >= 6) ? 0 : int(0, demands["s"][c]) ;
+                                                                    (frais[v] == "Oui" ? int(0, max[s in 0...n_scenarios](demands["f"][s][c])) : 0) ;
+    serve_s[d in 0...n_days][v in 0...m][c in 0...n] <-         (v == 1 || v >= 6) ? 0 : int(0, max[s in 0...n_scenarios](demands["s"][s][c])) ;
     norvegiennes[d in 0...n_days][v in 0...m][c in 0...n] <-    (v == 1 || v >= 6) ? 0 : int(0, n_norvegiennes);
 
     constraint cover[d in 0...n_days][v in 0...m](livraisons[d][v]);
@@ -267,11 +271,16 @@ function model() {
     }
 
     // Meet demands for each product type
-    for [c in 0...n] {
-        constraint sum[d in 0...n_days][v in 0...m](visits_l[d][v][c] * serve_a[d][v][c]) >= demands["a"][c];
-        constraint sum[d in 0...n_days][v in 0...m](visits_l[d][v][c] * serve_f[d][v][c]) >= demands["f"][c];
-        constraint sum[d in 0...n_days][v in 0...m](visits_l[d][v][c] * serve_s[d][v][c]) >= demands["s"][c];
+    for [s in 0...n_scenarios] {
+        for [c in 0...n] {
+            satisfied["a"][s][c] <- sum[d in 0...n_days][v in 0...m](visits_l[d][v][c] * serve_a[d][v][c]) >= demands["a"][s][c] ;
+            satisfied["f"][s][c] <- sum[d in 0...n_days][v in 0...m](visits_l[d][v][c] * serve_f[d][v][c]) >= demands["f"][s][c] ;
+            satisfied["s"][s][c] <- sum[d in 0...n_days][v in 0...m](visits_l[d][v][c] * serve_s[d][v][c]) >= demands["s"][s][c] ;
+        }
+        scenario_feasible[s] <- and[p in {"a", "f", "s"}][c in 0...n](satisfied[p][s][c]) ;
     }
+    // maximize sum[s in 0...n_scenarios](scenario_feasible[s]) ;
+    constraint sum[s in 0...n_scenarios](scenario_feasible[s]) >= 0.9 * n_scenarios ;
 
     add_specific_requirements() ;
 
@@ -281,11 +290,6 @@ function model() {
     used[v in 0...m] <- sum[d in 0...n_days](n_livraisons[d][v] + n_ramasses[d][v]) > 0 ;
     // minimize sum[v in 0...m](used[v]);
     // constraint sum[v in 0...m](used[v]) <= 5;
-
-    // for [v in 3...9] {
-    //     constraint used[v] <= used[v-1] ;
-    // }
-    
 
     minimize fuel_consumption ;
 
@@ -456,7 +460,7 @@ function check_solution_flexibility() {
     */
 }
 
-function check_solution_robustness(n_runs, sigma) {
+function check_solution_robustness(n_scenarios, sigma) {
     /*
     Checks the robustness of the tours provided as input
 
@@ -477,8 +481,8 @@ function check_solution_robustness(n_runs, sigma) {
 
     feasible = 0 ;
     st = datetime.now() ;
-    for [run in 0...n_runs] {
-        println("Simulating run ", run, "/",n_runs,"... time=",datetime.now()-st,"s feasible=",feasible,"/",run) ;
+    for [run in 0...n_scenarios] {
+        println("Simulating run ", run, "/",n_scenarios,"... time=",datetime.now()-st,"s feasible=",feasible,"/",run) ;
         for [p in {"a", "f", "s"}] {
             for [c in 0...n] {
                 demands[p][c] = max(1, ceil(original_demands[p][c] * rng.nextNormal(1, sigma))) ;
@@ -502,7 +506,7 @@ function check_solution_robustness(n_runs, sigma) {
         }
     }
 
-    perc_feasible = round(100 * feasible / n_runs) ;
+    perc_feasible = round(100 * feasible / n_scenarios) ;
     println("Percentage of feasible runs : ", perc_feasible, "%") ;
 }
 
