@@ -1,0 +1,13 @@
+{
+    "max_palette_capacity": 800,
+    "demi_palette_capacity": 360,
+    "n_norvegiennes": 10,
+    "norvegienne_capacity": 40,
+    "max_stops": 4,
+    "max_tour_duration": 210,
+    "wait_at_centres": 15,
+    "wait_at_pdrs": 40,
+    "duration_coefficients": [0.0435, 560.0],
+    "week_assignments": [1, 1, 2, 1, 1, 1, 2, 2],
+    "vehicle_allowed": [1, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0]
+}

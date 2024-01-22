@@ -11,21 +11,9 @@ function input() {
     if (outfile == nil) throw usage;
     if (week == nil) throw usage;
 
-    max_palette_capacity = 800 ;
-    demi_palette_capacity = 0.45 * max_palette_capacity ;
-    
-    norvegienne_capacity = 40 ;
-    n_norvegiennes = 10 ;
-
-    // The coefficients of the linear proxy for tour duration
-    // Determined in fit_duration_proxy.ipynb
-    duration_coefficients = {0.0435, 560.0} ;
-    wait_at_centres = 15 ; // in minutes
-    wait_at_pdrs = 40 ;
-    max_duration = 210 ; // in minutes
+    params = json.parse("data/params.json") ;
     
     centres = csv.parse("data/centres.csv");
-    // centres = csv.parse("data/centres_good_assignment.csv");
     pdr = csv.parse("data/points_de_ramasse.csv");
     matrix = csv.parse("data/euclidean_matrix.csv");
     vehicles = csv.parse("data/vehicules.csv");
@@ -97,7 +85,6 @@ function input() {
         fuel[i] = row[3];
 
         frais[i] = row[4];
-        // frais[i] = "Oui";
     }
 
     jours_map = {"Lundi": 0, "Mardi": 1, "Mercredi": 2, "Jeudi": 3, "Vendredi": 4};
@@ -147,19 +134,24 @@ function model() {
     livraisons[d in 0...n_days][v in 0...m] <- list(n);
     ramasses[d in 0...n_days][v in 0...m] <- list(n_pdr);
 
-    // Deliver quantity for each product type (ambiant/frais/surgelé)
-    // We don't actually use trucks 1 and >=7
-    serve_a[d in 0...n_days][v in 0...m][c in 0...n] <-         (v == 1 || v >= 6) ? 0 : int(0, demands["a"][c]) ;
-    serve_f[d in 0...n_days][v in 0...m][c in 0...n] <-         (v == 1 || v >= 6) ? 0 : 
-                                                                    (frais[v] == "Oui" ? int(0, demands["f"][c]) : 0) ;
-    serve_s[d in 0...n_days][v in 0...m][c in 0...n] <-         (v == 1 || v >= 6) ? 0 : int(0, demands["s"][c]) ;
-    norvegiennes[d in 0...n_days][v in 0...m][c in 0...n] <-    (v == 1 || v >= 6) ? 0 : int(0, n_norvegiennes);
-
     constraint cover[d in 0...n_days][v in 0...m](livraisons[d][v]);
     constraint cover[d in 0...n_days][v in 0...m](ramasses[d][v]);
 
     for [d in 0...n_days] {
         for [v in 0...m] {
+
+            // Deliver quantity for each product type (ambiant/frais/surgelé)
+            if (params["vehicle_allowed"][v]) {
+                serve_a[d][v][c in 0...n] <- int(0, demands["a"][c]) ;
+                serve_f[d][v][c in 0...n] <- frais[v] == "Oui" ? int(0, demands["f"][c]) : 0 ;
+                serve_s[d][v][c in 0...n] <- int(0, demands["s"][c]) ;
+                norvegiennes[d][v][c in 0...n] <- int(0, params["n_norvegiennes"]);
+            } else {
+                serve_a[d][v][c in 0...n] <- 0 ;
+                serve_f[d][v][c in 0...n] <- 0 ;
+                serve_s[d][v][c in 0...n] <- 0 ;
+                norvegiennes[d][v][c in 0...n] <- 0 ;
+            }
 
             n_livraisons[d][v] <- count(livraisons[d][v]) ;
             n_ramasses[d][v] <- count(ramasses[d][v]) ;
@@ -172,19 +164,19 @@ function model() {
             
             for [c in 0...n] {
                 load[d][v][c] <- visits_l[d][v][c] * (serve_a[d][v][c] + serve_f[d][v][c] + serve_s[d][v][c]) ;
-                palettes[d][v][c] <- ceil(visits_l[d][v][c] * serve_a[d][v][c] / max_palette_capacity) ;
-                demi_palettes[d][v][c] <- ceil(visits_l[d][v][c] * serve_f[d][v][c] / demi_palette_capacity);
+                palettes[d][v][c] <- ceil(visits_l[d][v][c] * serve_a[d][v][c] / params["max_palette_capacity"]) ;
+                demi_palettes[d][v][c] <- ceil(visits_l[d][v][c] * serve_f[d][v][c] / params["demi_palette_capacity"]);
 
                 demi_palettes_s[d][v][c] <- frais[v] == "Oui" ? 
                                     ceil(
                                         (visits_l[d][v][c] * serve_s[d][v][c] - 
-                                        norvegiennes[d][v][c] * norvegienne_capacity) / demi_palette_capacity
+                                        norvegiennes[d][v][c] * params["norvegienne_capacity"]) / params["demi_palette_capacity"]
                                         ) : 
                                     0;
 
                 constraint visits_l[d][v][c] * serve_s[d][v][c] <= 
-                                norvegiennes[d][v][c] * norvegienne_capacity +
-                                demi_palettes_s[d][v][c] * demi_palette_capacity ;
+                                norvegiennes[d][v][c] * params["norvegienne_capacity"] +
+                                demi_palettes_s[d][v][c] * params["demi_palette_capacity"] ;
                 constraint demi_palettes_s[d][v][c] >= 0 ;
             } 
 
@@ -216,23 +208,21 @@ function model() {
             // Based on a linear proxy from the tour length
             // See fit_duration_proxy.ipynb
             tour_duration[d][v] <- 
-                        duration_coefficients[0] * 
+                        params["duration_coefficients"][0] * 
                                 (route_dist[d][v] - (ram ? 
                                     dist_to_depot[ramasses[d][v][n_ramasses[d][v]-1] + n] : 
                                     (liv ? dist_to_depot[livraisons[d][v][n_livraisons[d][v]-1]] : 0))) + 
-                        duration_coefficients[1] + 
-                        wait_at_centres * 60 * n_livraisons[d][v] +
-                        wait_at_pdrs * 60 * n_ramasses[d][v]
+                        params["duration_coefficients"][1] + 
+                        params["wait_at_centres"] * 60 * n_livraisons[d][v] +
+                        params["wait_at_pdrs"] * 60 * n_ramasses[d][v]
                         ;
 
-            constraint tour_duration[d][v] <= max_duration * 60 ;
-            constraint n_livraisons[d][v] + n_ramasses[d][v] <= 4; // This is basically redundant
+            constraint tour_duration[d][v] <= params["max_tour_duration"] * 60 ;
+            constraint n_livraisons[d][v] + n_ramasses[d][v] <= params["max_stops"] ;
         }
 
-        constraint sum[c in 0...n][v in 0...m](norvegiennes[d][v][c]) <= n_norvegiennes ;
-
+        constraint sum[c in 0...n][v in 0...m](norvegiennes[d][v][c]) <= params["n_norvegiennes"] ;
     }
-
 
 
     // Time window constraints
@@ -278,14 +268,9 @@ function model() {
     // total_distance <- sum[d in 0...n_days][v in 0...m](route_dist[d][v]);
     fuel_consumption <- sum[d in 0...n_days][v in 0...m](route_dist[d][v] * fuel[v] / 100000);
 
-    used[v in 0...m] <- sum[d in 0...n_days](n_livraisons[d][v] + n_ramasses[d][v]) > 0 ;
+    // used[v in 0...m] <- sum[d in 0...n_days](n_livraisons[d][v] + n_ramasses[d][v]) > 0 ;
     // minimize sum[v in 0...m](used[v]);
     // constraint sum[v in 0...m](used[v]) <= 5;
-
-    // for [v in 3...9] {
-    //     constraint used[v] <= used[v-1] ;
-    // }
-    
 
     minimize fuel_consumption ;
 
@@ -541,7 +526,7 @@ function write_solution() {
                         demi_palettes[d][v][node].value,
                         demi_palettes_s[d][v][node].value
                 };
-                place["norvegiennes"] = serve_s[d][v][node].value > demi_palettes_s[d][v][node].value * demi_palette_capacity ? 
+                place["norvegiennes"] = serve_s[d][v][node].value > demi_palettes_s[d][v][node].value * params["demi_palette_capacity"] ? 
                                             norvegiennes[d][v][node].value : 0;
 
                 sol["tours"][key].add(place);

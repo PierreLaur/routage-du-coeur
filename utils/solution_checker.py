@@ -9,6 +9,7 @@ def check_solution_file(
     points_de_ramasse_file,
     vehicles_file,
     matrix_file,
+    params_file,
     week,
     solution_file,
 ):
@@ -23,14 +24,14 @@ def check_solution_file(
         points_de_ramasse_file,
         vehicles_file,
         matrix_file,
+        params_file,
         week,
     )
 
     duration_matrix = pd.read_excel("data/duration_matrix.xlsx", index_col=0)
-    wait_at_centres = 15  # minutes
-    wait_at_pdrs = 40  # minutes
     warning_duration_threshold = (
-        180  # Show a warning if estimated duration for a tour is higher than this
+        pb.max_tour_duration
+        - 30  # Show a warning if estimated duration for a tour is higher than this
     )
 
     obj = 0
@@ -138,7 +139,7 @@ def check_solution_file(
                     duration_matrix.iloc[a, b]
                     for a, b in zip(tours_flat[d, v][:-2], tours_flat[d, v][1:-1])
                 ) / 60 + sum(
-                    wait_at_centres if c < pb.n else wait_at_pdrs
+                    pb.wait_at_centres if c < pb.n else pb.wait_at_pdrs
                     for c in tours_flat[d, v][1:-1]
                 )
 
@@ -257,6 +258,7 @@ if __name__ == "__main__":
         "data/points_de_ramasse.xlsx",
         "data/vehicules.xlsx",
         "data/euclidean_matrix.xlsx",
+        "data/params.json",
         week,
         file,
     )

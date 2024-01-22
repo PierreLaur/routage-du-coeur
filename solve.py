@@ -24,6 +24,7 @@ if __name__ == "__main__":
         "data/points_de_ramasse.xlsx",
         "data/vehicules.xlsx",
         "data/euclidean_matrix.xlsx",
+        "data/params.json",
         week=args.week,
     )
 

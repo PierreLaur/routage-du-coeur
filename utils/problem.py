@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 import pandas as pd
 from math import ceil
+import json
 
 
 @dataclass
@@ -23,16 +24,20 @@ class Problem:
     n_norvegiennes: int
     norvegienne_capacity: int
     max_stops: int
+    max_tour_duration: int
+    wait_at_centres: int
+    wait_at_pdrs: int
 
 
 def read_problem(
-    centres_file, points_de_ramasse_file, vehicles_file, matrix_file, week
+    centres_file, points_de_ramasse_file, vehicles_file, matrix_file, params_file, week
 ):
     """Reads the problem from the usual input files and returns a Problem object"""
     centres = pd.read_excel(centres_file, index_col=0)
     points_de_ramasse = pd.read_excel(points_de_ramasse_file, index_col=0)
     vehicles = pd.read_excel(vehicles_file, index_col=0)
     matrix = pd.read_excel(matrix_file, index_col=0)
+    params = json.load(open(params_file, "r"))
 
     n = len(centres.index)
     n_pdr = len(points_de_ramasse.index)
@@ -43,12 +48,11 @@ def read_problem(
     consumptions = vehicles["Consommation (L/100km)"].astype(int).tolist()
     sizes = vehicles["Taille(Palettes)"].astype(int).tolist()
 
-    max_palette_capacity = 800
-    demi_palette_capacity = 0.45 * max_palette_capacity
-
-    max_stops = 4
-    norvegienne_capacity = 40
-    n_norvegiennes = 10
+    max_palette_capacity = params["max_palette_capacity"]
+    demi_palette_capacity = params["demi_palette_capacity"]
+    max_stops = params["max_stops"]
+    norvegienne_capacity = params["norvegienne_capacity"]
+    n_norvegiennes = params["n_norvegiennes"]
 
     demands = {
         "a": centres["Tonnage Ambiant (kg)"].fillna(0).astype(int).tolist(),
@@ -116,6 +120,9 @@ def read_problem(
         n_norvegiennes,
         norvegienne_capacity,
         max_stops,
+        params["max_tour_duration"],
+        params["wait_at_centres"],
+        params["wait_at_pdrs"],
     )
 
     return problem

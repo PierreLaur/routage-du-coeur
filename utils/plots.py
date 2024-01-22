@@ -290,6 +290,7 @@ def print_to_yaml(file, week, output_file):
             "data/points_de_ramasse.xlsx",
             "data/vehicules.xlsx",
             "data/euclidean_matrix.xlsx",
+            "data/params.json",
             week,
         )
 
@@ -432,6 +433,7 @@ def print_to_txt(file, week, output_file):
             "data/points_de_ramasse.xlsx",
             "data/vehicules.xlsx",
             "data/euclidean_matrix.xlsx",
+            "data/params.json",
             week,
         )
 
@@ -517,6 +519,7 @@ def plot_solution(file, week, output_file, specific_day=None):
             "data/points_de_ramasse.xlsx",
             "data/vehicules.xlsx",
             "data/euclidean_matrix.xlsx",
+            "data/params.json",
             week,
         )
 
