@@ -55,9 +55,9 @@ function input() {
     // Demands
     for [i in 0...n] {
         centre = index_to_centre[i] ;
-        demands["a"][i] = ceil(centres.rows[centre+1][4] * 1.15); 
-        demands["f"][i] = ceil(centres.rows[centre+1][5] * 1.15); // Add 15% for robustness
-        demands["s"][i] = ceil(centres.rows[centre+1][6] * 1.15);
+        demands["a"][i] = ceil(centres.rows[centre+1][4] * params["robustness_factor"]); 
+        demands["f"][i] = ceil(centres.rows[centre+1][5] * params["robustness_factor"]);
+        demands["s"][i] = ceil(centres.rows[centre+1][6] * params["robustness_factor"]);
 
         /* 
         Note : if the demand is normal, we can enforce demand constraints satisfied 95% of the time by
@@ -450,12 +450,14 @@ function check_solution_robustness(n_runs, sigma) {
     Prints how many feasible solutions it finds
     */
 
-    if (initfile == nil) return;
-
+    if (initfile == nil) {
+        println("Please enter an input file to check") ;
+        return ;
+    }
 
     for [p in {"a", "f", "s"}] {
         for [c in 0...n] {
-            original_demands[p][c] = demands[p][c] * (1/1.15) ;
+            original_demands[p][c] = demands[p][c] * (1/params["robustness_factor"]) ;
         }
     }
     rng = random.create() ;
@@ -466,7 +468,10 @@ function check_solution_robustness(n_runs, sigma) {
         println("Simulating run ", run, "/",n_runs,"... time=",datetime.now()-st,"s feasible=",feasible,"/",run) ;
         for [p in {"a", "f", "s"}] {
             for [c in 0...n] {
-                demands[p][c] = max(1, ceil(original_demands[p][c] * rng.nextNormal(1, sigma))) ;
+                rand = rng.nextNormal(1, sigma) ;
+                rand = max(1 - 1.5*sigma, rand) ;
+                rand = min(1 + 1.5*sigma, rand) ;
+                demands[p][c] = max(1, ceil(original_demands[p][c] * rand)) ;
             }
         }
 
@@ -477,7 +482,7 @@ function check_solution_robustness(n_runs, sigma) {
             set_initial_solution(true, nil); // Force the tours to be identical to the given solution
             ls.model.close();
             set_initial_solution(false, nil); // Give the given solution as a hint
-            ls.param.timeLimit = 3 ;
+            ls.param.timeLimit = 2 ;
             ls.param.verbosity = 0 ;
             ls.solve();
 
