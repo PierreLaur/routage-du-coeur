@@ -58,14 +58,6 @@ function input() {
         demands["a"][i] = ceil(centres.rows[centre+1][4] * params["robustness_factor"]); 
         demands["f"][i] = ceil(centres.rows[centre+1][5] * params["robustness_factor"]);
         demands["s"][i] = ceil(centres.rows[centre+1][6] * params["robustness_factor"]);
-
-        /* 
-        Note : if the demand is normal, we can enforce demand constraints satisfied 95% of the time by
-            setting the demand to mu + Ksigma
-            with K = Q0.975 = 1.645
-            if sigma = X% of mu, this is mu(1 + KX)
-        */
-
     }
 
     // Pickup weights (per pickup)
@@ -84,6 +76,7 @@ function input() {
         // Fuel consumption (L/100km)
         fuel[i] = row[3];
 
+        // Whether the vehicle can transport products that need to be refrigerated
         frais[i] = row[4];
     }
 
@@ -134,6 +127,7 @@ function model() {
     livraisons[d in 0...n_days][v in 0...m] <- list(n);
     ramasses[d in 0...n_days][v in 0...m] <- list(n_pdr);
 
+    // Every centre & pdr has to be delivered/picked up at least once
     constraint cover[d in 0...n_days][v in 0...m](livraisons[d][v]);
     constraint cover[d in 0...n_days][v in 0...m](ramasses[d][v]);
 
@@ -600,6 +594,7 @@ function main(args) {
         // fix(0.4);
         // set_current_tours();
 
+        // set_initial_solution(true, nil);
         ls.model.close();
 
         if (timelimit != nil) {

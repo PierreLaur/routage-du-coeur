@@ -27,6 +27,8 @@ class Problem:
     max_tour_duration: int
     wait_at_centres: int
     wait_at_pdrs: int
+    duration_coefficients: list[int]
+    vehicle_allowed: list[bool]
 
 
 def read_problem(
@@ -63,20 +65,25 @@ def read_problem(
     weights = points_de_ramasse["Poids par ramasse(kg)"].fillna(0).astype(int).tolist()
 
     # Ignore centres that are not delivered this week :
-    for i in range(n):
+    i = 0
+    for c in range(n):
         # 0 = every week
-        if centres["Semaine"][i] not in [week, 0]:
-            demands["a"][i] = 0
-            demands["f"][i] = 0
-            demands["s"][i] = 0
+        if centres["Semaine"][c] == 0:
+            continue
 
-    # Add 15% for robustness
+        if params["week_assignments"][i] != week:
+            demands["a"][c] = 0
+            demands["f"][c] = 0
+            demands["s"][c] = 0
+        i += 1
+
+    # Make the demands higher for robustness
     for c in range(1, n):
-        demands["a"][c] = ceil(demands["a"][c] * 1.15)
-        demands["f"][c] = ceil(demands["f"][c] * 1.15)
-        demands["s"][c] = ceil(demands["s"][c] * 1.15)
+        demands["a"][c] = ceil(demands["a"][c] * params["robustness_factor"])
+        demands["f"][c] = ceil(demands["f"][c] * params["robustness_factor"])
+        demands["s"][c] = ceil(demands["s"][c] * params["robustness_factor"])
     for p in range(n_pdr):
-        weights[p] = ceil(weights[p] * 1.15)
+        weights[p] = ceil(weights[p] * params["robustness_factor"])
 
     # Demand for depot is set to 0
     for d in demands.values():
@@ -123,6 +130,8 @@ def read_problem(
         params["max_tour_duration"],
         params["wait_at_centres"],
         params["wait_at_pdrs"],
+        params["duration_coefficients"],
+        [bool(x) for x in params["vehicle_allowed"]],
     )
 
     return problem

@@ -9,6 +9,6 @@
     "wait_at_pdrs": 40,
     "duration_coefficients": [0.0435, 556.89],
     "week_assignments": [1, 1, 2, 1, 1, 1, 2, 2],
-    "vehicle_allowed": [1, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
-    "robustness_factor": 1.2
+    "vehicle_allowed": [1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0],
+    "robustness_factor": 1.15
 }

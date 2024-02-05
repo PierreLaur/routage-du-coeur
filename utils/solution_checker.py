@@ -82,7 +82,14 @@ def check_solution_file(
                             if c < pb.n
                         )
                         == 0
-                    )
+                    ), [
+                        v,
+                        sum(
+                            palettes[d, v, c][2]
+                            for c in tours_flat[d, v][1:-1]
+                            if c < pb.n
+                        ),
+                    ]
 
                 # Check the vehicle capacities
                 assert (
@@ -163,7 +170,7 @@ def check_solution_file(
         )
 
     # Check that the objective value is correct
-    assert obj / 100000 == fuel_consumption
+    assert obj / 100000 == fuel_consumption, [obj, fuel_consumption]
     assert distance == int(total_distance), [distance, total_distance]
 
     # Check that the number of pickups is correct for each day
@@ -177,6 +184,7 @@ def check_solution_file(
                     if (d, v) in tours_flat and pb.frais[v]
                 ]
             )
+
             assert n_visits == pb.j_de_ramasse[p].count(d), [
                 p,
                 d,
@@ -194,6 +202,11 @@ def check_solution_file(
     assert carrefour_centrale_index in tours_flat[2, 0][1:-1]
     assert carrefour_centrale_index in tours_flat[2, 2][1:-1]
     assert carrefour_centrale_index in tours_flat[4, 2][1:-1]
+
+    ### No other pickups
+    assert len([p for p in tours_flat[2, 0][1:-1] if p >= pb.n]) == 1
+    assert len([p for p in tours_flat[2, 2][1:-1] if p >= pb.n]) == 1
+    assert len([p for p in tours_flat[4, 2][1:-1] if p >= pb.n]) == 1
 
     # Check time window constraints
     for d in range(pb.n_days):
@@ -226,7 +239,16 @@ def check_solution_file(
                 if (d, v, c) in deliveries
             )
             >= pb.demands["a"][c]
-        )
+        ), [
+            sum(
+                deliveries[d, v, c][0]
+                for v in range(pb.m)
+                for d in range(pb.n_days)
+                if (d, v, c) in deliveries
+            ),
+            pb.demands["a"][c],
+            c,
+        ]
         assert (
             sum(
                 deliveries[d, v, c][1]
