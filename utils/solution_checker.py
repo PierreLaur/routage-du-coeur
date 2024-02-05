@@ -30,8 +30,7 @@ def check_solution_file(
 
     duration_matrix = pd.read_excel("data/duration_matrix.xlsx", index_col=0)
     warning_duration_threshold = (
-        pb.max_tour_duration
-        - 30  # Show a warning if estimated duration for a tour is higher than this
+        180  # Show a warning if estimated duration for a tour is higher than this
     )
 
     obj = 0

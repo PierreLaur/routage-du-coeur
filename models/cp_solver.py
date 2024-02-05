@@ -23,7 +23,7 @@ class LogPrinter(cp_model.CpSolverSolutionCallback):
                 / self.BestObjectiveBound()
             )
             print(
-                f"[{self.WallTime():.2f}s]  obj = {obj/1000:<7.2f}km     gap = {gap:.2f}%"
+                f"[{self.WallTime():.2f}s]  obj = {obj:<7.2f}L     gap = {gap:.2f}% [{self.BestObjectiveBound():.2f}, {obj:.2f}]"
             )
 
 
@@ -75,6 +75,8 @@ def add_hints(
 
     for d in range(problem.n_days):
         for v in range(problem.m):
+            if not problem.vehicle_allowed[v]:
+                continue
             vd = v + d * problem.m
             key = str(d) + ", " + str(v)
 
@@ -116,8 +118,7 @@ def add_hints(
                     for a, b in to_assign:
                         model.Add(arcs[vd, a, b][2] == 0)
                 else:
-                    if problem.vehicle_allowed[v]:
-                        model.Add(visits[d, v, 0] == 0)
+                    model.Add(visits[d, v, 0] == 0)
             else:
                 if key in hint.keys() and hint[key]:
                     to_assign = set(
@@ -126,15 +127,17 @@ def add_hints(
                         for b in range(problem.n + problem.n_pdr)
                         if a != b and (vd, a, b) in arcs
                     )
-                    model.AddHint(visits[d, v, 0], 1)
+                    if (d, v, 0) in visits:
+                        model.AddHint(visits[d, v, 0], 1)
                     a = 0
                     for place in hint[key]:
                         b = place["index"]
-                        model.AddHint(arcs[vd, a, b][2], 1)
-                        to_assign.remove((a, b))
+                        if (vd, a, b) in arcs:
+                            model.AddHint(arcs[vd, a, b][2], 1)
+                            to_assign.remove((a, b))
                         a = b
 
-                        if b < problem.n:
+                        if b < problem.n and (d, v, b) in palettes:
                             model.AddHint(palettes[d, v, b], place["palettes"][0])
                             model.AddHint(norvegiennes[d, v, b], place["norvegiennes"])
                             model.AddHint(delivers["a"][d, v, b], place["delivery"][0])
@@ -150,11 +153,13 @@ def add_hints(
                                 )
                             model.AddHint(delivers["s"][d, v, b], place["delivery"][2])
 
-                    model.AddHint(arcs[vd, a, 0][2], 1)
-                    to_assign.remove((a, 0))
+                    if (vd, a, 0) in arcs:
+                        model.AddHint(arcs[vd, a, 0][2], 1)
+                        to_assign.remove((a, 0))
 
                     for a, b in to_assign:
-                        model.AddHint(arcs[vd, a, b][2], 0)
+                        if (vd, a, b) in arcs:
+                            model.AddHint(arcs[vd, a, b][2], 0)
                 else:
                     pass
                     if problem.vehicle_allowed[v]:
@@ -294,6 +299,10 @@ def reoptimize_tours(pb, solver, tours, delivers, obj):
 
 
 def add_specific_requirements(pb, model, visits):
+    """
+    Adds a few "hard-coded" constraints
+    These are not written in the input files but have been specified by the client
+    """
 
     carrefour_centrale_index = pb.n + 5
 
@@ -332,7 +341,7 @@ def solve_vrp(
 
     model = cp_model.CpModel()
 
-    pruned = prune_arcs(pb.n + pb.n_pdr, pb.matrix)
+    pruned = prune_arcs(pb.n + pb.n_pdr, pb.matrix, limit=1)
     print(f"    Pruned arcs : {100*len(pruned)/(pb.n+pb.n_pdr)**2:.2f}%")
 
     ########## Arcs & Visit variables ###########
@@ -586,7 +595,7 @@ def solve_vrp(
             )
 
             # scale the coefficients for precision reasons
-            scaling_factor = 1000
+            scaling_factor = 1000000
             coefs = [round(scaling_factor * c) for c in pb.duration_coefficients]
             tour_duration = (
                 coefs[0]
@@ -628,9 +637,9 @@ def solve_vrp(
     # solver.parameters.min_num_lns_workers = 8
 
     print("Solving...")
-    solver.parameters.log_search_progress = True
-    status = solver.Solve(model)
-    # status = solver.Solve(model, LogPrinter())
+    # solver.parameters.log_search_progress = True
+    # status = solver.Solve(model)
+    status = solver.Solve(model, LogPrinter())
 
     if status not in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
         print("No solution found")
