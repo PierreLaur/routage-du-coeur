@@ -25,10 +25,12 @@ class Problem:
     norvegienne_capacity: int
     max_stops: int
     max_tour_duration: int
+    max_first_pickup_time: int
     wait_at_centres: int
     wait_at_pdrs: int
     duration_coefficients: list[int]
     vehicle_allowed: list[bool]
+    disallow_norvegiennes_in_PL: bool
 
 
 def read_problem(
@@ -83,7 +85,7 @@ def read_problem(
         demands["f"][c] = ceil(demands["f"][c] * params["robustness_factor"])
         demands["s"][c] = ceil(demands["s"][c] * params["robustness_factor"])
     for p in range(n_pdr):
-        weights[p] = ceil(weights[p] * params["robustness_factor"])
+        weights[p] = ceil(weights[p])
 
     # Demand for depot is set to 0
     for d in demands.values():
@@ -128,10 +130,12 @@ def read_problem(
         norvegienne_capacity,
         max_stops,
         params["max_tour_duration"],
+        params["max_first_pickup_time"],
         params["wait_at_centres"],
         params["wait_at_pdrs"],
         params["duration_coefficients"],
         [bool(x) for x in params["vehicle_allowed"]],
+        params["disallow_norvegiennes_in_PL"],
     )
 
     return problem

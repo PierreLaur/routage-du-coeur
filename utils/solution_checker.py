@@ -149,10 +149,62 @@ def check_solution_file(
                     for c in tours_flat[d, v][1:-1]
                 )
 
+                model_estimation = (
+                    pb.duration_coefficients[0]
+                    * sum(
+                        pb.matrix.iloc[a, b]
+                        for a, b in zip(tours_flat[d, v][:-2], tours_flat[d, v][1:-1])
+                    )
+                    + pb.duration_coefficients[1]
+                ) / 60 + sum(
+                    pb.wait_at_centres if c < pb.n else pb.wait_at_pdrs
+                    for c in tours_flat[d, v][1:-1]
+                )
+
                 if estimated_duration > warning_duration_threshold:
                     print(
                         f"Warning : tour {key} is ~{estimated_duration//60:.0f}h{estimated_duration%60:.0f}min long :",
                         [duration_matrix.index[c] for c in tours_flat[d, v][1:-1]],
+                        f" - model estimate {model_estimation//60:.0f}h{model_estimation%60:.0f}min",
+                    )
+
+                first_pickup_estimated_duration = (
+                    sum(
+                        duration_matrix.iloc[a, b]
+                        for a, b in zip(tours_flat[d, v][:-2], tours_flat[d, v][1:-1])
+                        if a == 0 or a < pb.n
+                    )
+                    / 60
+                    + sum(
+                        pb.wait_at_centres for c in tours_flat[d, v][1:-1] if c < pb.n
+                    )
+                    if any(node >= pb.n for node in tours_flat[d, v][:-2])
+                    else 0
+                )
+                model_estimation = (
+                    (
+                        pb.duration_coefficients[0]
+                        * sum(
+                            pb.matrix.iloc[a, b]
+                            for a, b in zip(
+                                tours_flat[d, v][:-2], tours_flat[d, v][1:-1]
+                            )
+                            if a < pb.n
+                        )
+                        + pb.duration_coefficients[1]
+                    )
+                    / 60
+                    + sum(
+                        pb.wait_at_centres for c in tours_flat[d, v][1:-1] if c < pb.n
+                    )
+                    if any(node >= pb.n for node in tours_flat[d, v][:-2])
+                    else 0
+                )
+                if first_pickup_estimated_duration > pb.max_first_pickup_time:
+                    print(
+                        f"Warning : first pickup of tour {key} is at ~{estimated_duration//60:.0f}h{estimated_duration%60:.0f}min :",
+                        [duration_matrix.index[c] for c in tours_flat[d, v][1:-1]],
+                        f" - model estimate {model_estimation//60:.0f}h{model_estimation%60:.0f}min",
                     )
 
     for d in range(pb.n_days):
@@ -206,6 +258,32 @@ def check_solution_file(
     assert len([p for p in tours_flat[2, 0][1:-1] if p >= pb.n]) == 1
     assert len([p for p in tours_flat[2, 2][1:-1] if p >= pb.n]) == 1
     assert len([p for p in tours_flat[4, 2][1:-1] if p >= pb.n]) == 1
+
+    ### PL can't deliver Gde Bretagne
+    index_gde_bretagne = 24
+    assert not any(
+        c == index_gde_bretagne
+        for (d, v) in tours_flat
+        if v == 0
+        for c in tours_flat[d, v]
+    )
+
+    ### Revel must be delivered on tuesdays with an exclusive tour
+    index_revel = 20
+    assert tours_flat[1, 2] == [0, index_revel, 0]
+    assert not any(
+        c == index_revel
+        for (d, v) in tours_flat
+        if (d, v) != (1, 2)
+        for c in tours_flat[d, v]
+    )
+
+    ### Les arènes must be delivered on Friday along with the pickup at Leclerc Blagnac
+    index_arenes = 26
+    index_lc_blagnac = 3 + pb.n
+    assert index_arenes in tours_flat[4, 3] and index_lc_blagnac in tours_flat[4, 3]
+
+    assert all(norvegiennes[d, v, c] == 0 for (d, v, c) in norvegiennes if v == 0)
 
     # Check time window constraints
     for d in range(pb.n_days):

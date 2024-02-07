@@ -1,14 +1,16 @@
 {
     "max_palette_capacity": 800,
     "demi_palette_capacity": 360,
-    "n_norvegiennes": 10,
+    "n_norvegiennes": 26,
     "norvegienne_capacity": 40,
     "max_stops": 4,
     "max_tour_duration": 180,
+    "max_first_pickup_time": 120,
     "wait_at_centres": 30,
     "wait_at_pdrs": 45,
     "duration_coefficients": [0.0435, 556.89],
     "week_assignments": [1, 2, 2, 2, 2, 1, 1, 1],
     "vehicle_allowed": [1, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
-    "robustness_factor": 1.15
+    "robustness_factor": 1.15,
+    "disallow_norvegiennes_in_PL": true
 }

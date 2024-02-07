@@ -69,7 +69,7 @@ function input() {
 
     // Pickup weights (per pickup)
     for [p in 0...n_pdr] {
-        weight[p] = ceil(pdr.rows[p][5] * 1.15);
+        weight[p] = ceil(pdr.rows[p][5]);
     }
 
     for [i in 0...m] {
@@ -127,6 +127,36 @@ function add_specific_requirements() {
     constraint n_ramasses[2][2] == 1;
     constraint n_ramasses[4][2] == 1;
 
+    // The PL cannot deliver Toulouse/Grande-Bretagne
+    index_gde_bretagne = 24 - 1 ;
+    for [c in 0...n] {
+        if (index_to_centre[c] == index_gde_bretagne) {
+            constraint and[d in 0...n_days](!visits_l[d][0][c]);
+            break ;
+        }
+    }
+
+    // A camion frigo must deliver Revel on Tuesdays and do nothing else
+    index_revel = 20 - 1 ;
+    for [c in 0...n] {
+        if (index_to_centre[c] == index_revel) {
+            constraint visits_l[1][2][c] ;
+            constraint n_livraisons[1][2] == 1 ;
+            constraint n_ramasses[1][2] == 0 ;
+            break ;
+        }
+    }
+
+    // A Camion Frigo must deliver les arènes on Friday then pickup Leclerc Blagnac
+    index_lc_blagnac = 3 ;
+    index_arenes = 26 - 1 ;
+    for [c in 0...n] {
+        if (index_to_centre[c] == index_arenes) {
+            constraint visits_l[4][3][c] ;
+            constraint visits_r[4][3][index_lc_blagnac];
+            break ;
+        }
+    }
 }
 
 function model() {
@@ -145,7 +175,9 @@ function model() {
             serve_a[d][v][c in 0...n] <- int(0, demands["a"][c]) ;
             serve_f[d][v][c in 0...n] <- frais[v] == "Oui" ? int(0, demands["f"][c]) : 0 ;
             serve_s[d][v][c in 0...n] <- int(0, demands["s"][c]) ;
-            norvegiennes[d][v][c in 0...n] <- int(0, params["n_norvegiennes"]);
+
+            // No norvegiennes on vehicle 0 (PL)
+            norvegiennes[d][v][c in 0...n] <- params["disallow_norvegiennes_in_PL"] && v==0 ? 0 : int(0, params["n_norvegiennes"]);
 
             n_livraisons[d][v] <- count(livraisons[d][v]) ;
             n_ramasses[d][v] <- count(ramasses[d][v]) ;
@@ -184,7 +216,6 @@ function model() {
             // We assume 2 palettes are used for each pickup
             constraint sum[p in 0...n_pdr](2 * visits_r[d][v][p]) <= sizes[v] ;
 
-
             // Deliver first, then pickup
             route_dist[d][v] <- 
                 + (liv ?  dist_from_depot[livraisons[d][v][0]] 
@@ -200,7 +231,7 @@ function model() {
 
             // Constrain the estimated tour duration
             // Based on a linear proxy from the tour length
-            // See fit_duration_proxy.ipynb
+            // See fit_duration_proxy.jl
             tour_duration[d][v] <- 
                         params["duration_coefficients"][0] * 
                                 (route_dist[d][v] - (ram ? 
@@ -213,6 +244,20 @@ function model() {
 
             constraint tour_duration[d][v] <= params["max_tour_duration"] * 60 ;
             constraint n_livraisons[d][v] + n_ramasses[d][v] <= params["max_stops"] ;
+
+            first_pickup_dist <- ram ? 
+                    (liv ? dist_from_depot[livraisons[d][v][0]] 
+                        + sum(1...n_livraisons[d][v], i => dist_matrix[livraisons[d][v][i - 1]][livraisons[d][v][i]])
+                        + (ram ? 
+                            dist_matrix[livraisons[d][v][n_livraisons[d][v]-1]][ramasses[d][v][0] + n]
+                            : dist_to_depot[livraisons[d][v][n_livraisons[d][v]-1]])
+                        : dist_from_depot[ramasses[d][v][0] + n] ) : 0 ;
+
+            first_pickup_time <- params["duration_coefficients"][0] * first_pickup_dist +
+                        params["duration_coefficients"][1] + 
+                        params["wait_at_centres"] * 60 * n_livraisons[d][v];
+            constraint first_pickup_time <= params["max_first_pickup_time"] * 60 ;
+
         }
 
         constraint sum[c in 0...n][v in 0...m : params["vehicle_allowed"][v]](norvegiennes[d][v][c]) <= params["n_norvegiennes"] ;
@@ -394,7 +439,11 @@ function set_current_tours() {
     for [d in 0...n_days] {
         for [v in 0...m] {
             key = "(" + d + ", " + v + ")" ;
-            if (current_tours[key] == nil) continue;
+            if (current_tours[key] == nil) {
+                constraint n_livraisons[d][v] == 0 ;
+                constraint n_ramasses[d][v] == 0 ;
+                continue;
+            }
             init_liv = {} ;
             init_ram = {} ;
             i = 0 ;

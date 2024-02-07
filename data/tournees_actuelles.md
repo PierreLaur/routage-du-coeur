@@ -72,6 +72,8 @@ Bessieres
 Leclerc Rouffiac
 62.6km
 
+Revel
+
 ## Mercredi
 
 Malepere
@@ -121,6 +123,8 @@ Leguevin
 Villefranche
 Auterive
 110km
+
+Fronton (S1)
 
 ## Vendredi
 

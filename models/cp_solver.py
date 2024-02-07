@@ -28,17 +28,17 @@ class LogPrinter(cp_model.CpSolverSolutionCallback):
 
 
 def add_domsym_breaking(
+    pb,
     model,
-    n,
-    m,
-    n_days,
     delivers,
     visits,
 ):
     # Dominance breaking
-    for d in range(n_days):
-        for v in range(m):
-            for c in range(1, n):
+    for d in range(pb.n_days):
+        for v in range(pb.m):
+            if not pb.vehicle_allowed[v]:
+                continue
+            for c in range(1, pb.n):
                 # Visited -> delivery is not 0
                 model.Add(
                     delivers["a"][d, v, c]
@@ -47,10 +47,12 @@ def add_domsym_breaking(
                     > 0
                 ).OnlyEnforceIf(visits[d, v, c])
 
-    # # Symmetry breaking
-    # for d in range(1, n_days):
-    #     for v in range(m):
-    #         model.AddImplication(visits[d, v, 0], visits[d, v - 1, 0])
+    # Symmetry breaking
+    for d in range(1, pb.n_days):
+        for v in range(3, 8):
+            if not pb.vehicle_allowed[v]:
+                continue
+            model.AddImplication(visits[d, v, 0], visits[d, v - 1, 0])
     return
 
 
@@ -139,7 +141,10 @@ def add_hints(
 
                         if b < problem.n and (d, v, b) in palettes:
                             model.AddHint(palettes[d, v, b], place["palettes"][0])
-                            model.AddHint(norvegiennes[d, v, b], place["norvegiennes"])
+                            if v != 0 or not problem.disallow_norvegiennes_in_PL:
+                                model.AddHint(
+                                    norvegiennes[d, v, b], place["norvegiennes"]
+                                )
                             model.AddHint(delivers["a"][d, v, b], place["delivery"][0])
                             if problem.frais[v]:
                                 model.AddHint(
@@ -298,34 +303,72 @@ def reoptimize_tours(pb, solver, tours, delivers, obj):
     return tours, int(obj)
 
 
-def add_specific_requirements(pb, model, visits):
+def add_specific_requirements(pb, model: cp_model.CpModel, visits, arcs):
     """
     Adds a few "hard-coded" constraints
     These are not written in the input files but have been specified by the client
     """
 
+    # The PL must visit Carrefour Centrale on Wednesday
+    # He must only do one pickup
     carrefour_centrale_index = pb.n + 5
-
     model.Add(visits[2, 0, carrefour_centrale_index] == 1)
     model.AddBoolAnd(
         visits[2, 0, p].Not()
         for p in range(pb.n, pb.n + pb.n_pdr)
         if p != carrefour_centrale_index
     )
+    vd = 0 + 2 * pb.m
+    model.Add(arcs[vd, carrefour_centrale_index, 0][2] == 1)
 
+    # The first camion Frigo must visit Carrefour Centrale on Wednesday and Friday
     model.Add(visits[2, 2, carrefour_centrale_index] == 1)
+    model.Add(visits[4, 2, carrefour_centrale_index] == 1)
+
+    # To simplify we say it only does one pickup (in reality he delivers a centre afterwards)
     model.AddBoolAnd(
         visits[2, 2, p].Not()
         for p in range(pb.n, pb.n + pb.n_pdr)
         if p != carrefour_centrale_index
     )
-
-    model.Add(visits[4, 2, carrefour_centrale_index] == 1)
     model.AddBoolAnd(
         visits[4, 2, p].Not()
         for p in range(pb.n, pb.n + pb.n_pdr)
         if p != carrefour_centrale_index
     )
+
+    # The PL cannot deliver Toulouse/Grande-Bretagne
+    index_gde_bretagne = 24
+    model.AddBoolAnd(visits[d, 0, index_gde_bretagne].Not() for d in range(pb.n_days))
+
+    # A camion frigo must deliver Revel on Tuesdays and do nothing else
+    index_revel = 20
+    model.AddBoolAnd(
+        visits[1, 2, node] if node == index_revel else visits[1, 2, node].Not()
+        for node in range(1, pb.n + pb.n_pdr)
+    )
+    vd = 2 + 1 * pb.m
+    model.AddBoolAnd(
+        (
+            arcs[vd, a, b][2]
+            if (a, b) in [(0, index_revel), (index_revel, 0)]
+            else arcs[vd, a, b][2].Not()
+        )
+        for (vd2, a, b) in arcs
+        if vd2 == vd and a != b
+    )
+    model.AddBoolAnd(
+        visits[d, v, index_revel].Not()
+        for d in range(pb.n_days)
+        for v in range(pb.m)
+        if pb.vehicle_allowed[v] and v != 2
+    )
+
+    # A Camion Frigo must deliver Les Arènes on Friday then pickup Leclerc Blagnac
+    index_lc_blagnac = pb.n + 3
+    index_arenes = 26
+    model.Add(visits[4, 3, index_arenes] == 1)
+    model.Add(visits[4, 3, index_lc_blagnac] == 1)
 
 
 def solve_vrp(
@@ -372,12 +415,10 @@ def solve_vrp(
                         lit = model.NewBoolVar("arc_%i_%i_%i" % (vd, node, node2))
                         arcs[vd, node, node2] = (node, node2, lit)
 
-            # If you don't visit the depot, visit nothing
+            # # If you don't visit the depot, visit nothing
             model.AddBoolAnd(
-                visits[d, v, node].Not() for node in range(pb.n + pb.n_pdr)
+                visits[d, v, node].Not() for node in range(1, pb.n + pb.n_pdr)
             ).OnlyEnforceIf(visits[d, v, 0].Not())
-            # for c in range(1, n):
-            #     model.AddImplication(visits[v, 0].Not(), visits[v, c].Not())
 
             model.AddCircuit(
                 [
@@ -402,6 +443,18 @@ def solve_vrp(
     for d in range(pb.n_days):
         for v in allowed_vehicles:
             for c in range(pb.n):
+
+                if pb.demands["a"][c] + pb.demands["f"][c] + pb.demands["s"][c] == 0:
+                    delivers["a"][d, v, c] = 0
+                    delivers["f"][d, v, c] = 0
+                    delivers["s"][d, v, c] = 0
+                    palettes[d, v, c] = 0
+                    demi_palettes[d, v, c] = 0
+                    demi_palettes_s[d, v, c] = 0
+                    norvegiennes[d, v, c] = 0
+
+                    continue
+
                 delivers["a"][d, v, c] = model.NewIntVar(
                     0,
                     min(pb.capacities[v], pb.demands["a"][c]),
@@ -432,7 +485,10 @@ def solve_vrp(
                     "delivers_s_%i_%i_%i" % (d, v, c),
                 )
 
-                norvegiennes[d, v, c] = model.NewIntVar(0, pb.n_norvegiennes, "")
+                if pb.disallow_norvegiennes_in_PL and v == 0:
+                    norvegiennes[d, v, c] = 0
+                else:
+                    norvegiennes[d, v, c] = model.NewIntVar(0, pb.n_norvegiennes, "")
 
                 # Use an appropriate number of palettes
                 model.Add(
@@ -450,15 +506,16 @@ def solve_vrp(
                 )
 
                 # Not visited -> delivery is 0
-                model.Add(delivers["a"][d, v, c] == 0).OnlyEnforceIf(
-                    visits[d, v, c].Not()
-                )
-                model.Add(delivers["f"][d, v, c] == 0).OnlyEnforceIf(
-                    visits[d, v, c].Not()
-                )
-                model.Add(delivers["s"][d, v, c] == 0).OnlyEnforceIf(
-                    visits[d, v, c].Not()
-                )
+                model.Add(
+                    palettes[d, v, c]
+                    + demi_palettes[d, v, c]
+                    + demi_palettes_s[d, v, c]
+                    + norvegiennes[d, v, c]
+                    + delivers["a"][d, v, c]
+                    + delivers["f"][d, v, c]
+                    + delivers["s"][d, v, c]
+                    == 0
+                ).OnlyEnforceIf(visits[d, v, c].Not())
 
     for d in range(pb.n_days):
         # Visit pdrs at required days
@@ -469,14 +526,18 @@ def solve_vrp(
                 )
             else:
                 model.AddBoolAnd(
-                    [visits[d, v, pdr + pb.n].Not() for v in allowed_vehicles if v != 0]
+                    [
+                        visits[d, v, pdr + pb.n].Not()
+                        for v in allowed_vehicles
+                        if (d, v) != (2, 0)
+                    ]
                 )
 
             # No ramasses with camions not frais
             model.AddBoolAnd(
                 visits[d, v, pdr + pb.n].Not()
                 for v in allowed_vehicles
-                if not pb.frais[v] and v != 0
+                if not pb.frais[v] and (d, v) != (2, 0)
             )
 
         # Only deliver centres on allowed days
@@ -484,7 +545,8 @@ def solve_vrp(
             if d not in pb.j_de_livraison_possibles[c]:
                 model.AddBoolAnd([visits[d, v, c].Not() for v in allowed_vehicles])
 
-    add_specific_requirements(pb, model, visits)
+    add_specific_requirements(pb, model, visits, arcs)
+    # add_domsym_breaking(pb, model, delivers, visits)
 
     # # Add hints
     if hint:
@@ -502,7 +564,7 @@ def solve_vrp(
             force=False,
         )
 
-    # Every customer must be served exactly his demand
+    # Every customer must be served his demand
     for c in range(1, pb.n):
         model.Add(
             sum(
@@ -510,7 +572,7 @@ def solve_vrp(
                 for v in allowed_vehicles
                 for d in range(pb.n_days)
             )
-            == pb.demands["a"][c]
+            >= pb.demands["a"][c]
         )
         model.Add(
             sum(
@@ -518,7 +580,7 @@ def solve_vrp(
                 for v in allowed_vehicles
                 for d in range(pb.n_days)
             )
-            == pb.demands["f"][c]
+            >= pb.demands["f"][c]
         )
         model.Add(
             sum(
@@ -526,7 +588,7 @@ def solve_vrp(
                 for v in allowed_vehicles
                 for d in range(pb.n_days)
             )
-            == pb.demands["s"][c]
+            >= pb.demands["s"][c]
         )
 
     # Capacity constraints
@@ -570,7 +632,7 @@ def solve_vrp(
                 <= 2 * pb.sizes[v]
             )
 
-            # Two palettes per ramasse
+            # Two palettes per pickup
             model.Add(
                 sum(2 * visits[d, v, p] for p in range(pb.n, pb.n + pb.n_pdr))
                 <= pb.sizes[v]
@@ -620,6 +682,30 @@ def solve_vrp(
                 <= pb.max_stops
             )
 
+            time_to_first_pickup = (
+                coefs[0]
+                * sum(
+                    arc[2] * pb.matrix.iloc[arc[0], arc[1]]
+                    for arc in vd_arcs
+                    if (arc[0] < pb.n)
+                )
+                + coefs[1]
+                + scaling_factor
+                * pb.wait_at_centres
+                * 60
+                * sum(visits[d, v, c] for c in range(1, pb.n))
+            )
+            ram = model.NewBoolVar("")
+            model.Add(
+                time_to_first_pickup <= scaling_factor * pb.max_first_pickup_time * 60
+            ).OnlyEnforceIf(ram)
+            model.AddBoolAnd(
+                visits[d, v, p].Not() for p in range(pb.n, pb.n_pdr)
+            ).OnlyEnforceIf(ram.Not())
+            model.AddBoolOr(
+                visits[d, v, p] for p in range(pb.n, pb.n_pdr)
+            ).OnlyEnforceIf(ram)
+
     fuel_consumption = (
         sum(
             route_dist[d, v] * pb.consumptions[v]
@@ -630,9 +716,20 @@ def solve_vrp(
     )
     model.Minimize(fuel_consumption)
 
-    solver = cp_model.CpSolver()
+    model.AddDecisionStrategy(
+        [arcs[vd, 0, b][2] for (vd, _, b) in arcs],
+        cp_model.CHOOSE_FIRST,
+        cp_model.SELECT_MAX_VALUE,
+    )
+    model.AddDecisionStrategy(
+        visits.values(),
+        cp_model.CHOOSE_FIRST,
+        cp_model.SELECT_MIN_VALUE,
+    )
 
+    solver = cp_model.CpSolver()
     solver.parameters.num_workers = 16
+    # solver.parameters.use_lns_only = True
     # solver.parameters.max_time_in_seconds = 180
     # solver.parameters.min_num_lns_workers = 8
 
