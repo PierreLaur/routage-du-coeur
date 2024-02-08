@@ -290,6 +290,7 @@ def print_to_yaml(file, week, output_file):
             "data/points_de_ramasse.xlsx",
             "data/vehicules.xlsx",
             "data/euclidean_matrix.xlsx",
+            "data/duration_matrix_w_traffic.xlsx",
             "data/params.json",
             week,
         )
@@ -433,6 +434,7 @@ def print_to_txt(file, week, output_file):
             "data/points_de_ramasse.xlsx",
             "data/vehicules.xlsx",
             "data/euclidean_matrix.xlsx",
+            "data/duration_matrix_w_traffic.xlsx",
             "data/params.json",
             week,
         )
@@ -519,6 +521,7 @@ def plot_solution(file, week, output_file, specific_day=None):
             "data/points_de_ramasse.xlsx",
             "data/vehicules.xlsx",
             "data/euclidean_matrix.xlsx",
+            "data/duration_matrix_w_traffic.xlsx",
             "data/params.json",
             week,
         )
@@ -623,7 +626,7 @@ if __name__ == "__main__":
 
     file_name = args.outfile.split(".")[0]
 
-    plot_solution(args.infile, args.week, file_name + ".html")
+    # plot_solution(args.infile, args.week, file_name + ".html")
     print_to_txt(args.infile, args.week, file_name + ".txt")
-    print_to_yaml(args.infile, args.week, file_name + ".yaml")
+    # print_to_yaml(args.infile, args.week, file_name + ".yaml")
     # make_dashboard("solutions/week_1.yaml", 1, "dashboard.html")

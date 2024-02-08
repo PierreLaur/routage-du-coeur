@@ -16,6 +16,7 @@ function input() {
     centres = csv.parse("data/centres.csv");
     pdr = csv.parse("data/points_de_ramasse.csv");
     matrix = csv.parse("data/euclidean_matrix.csv");
+    matrix2 = csv.parse("data/duration_matrix_w_traffic.csv");
     vehicles = csv.parse("data/vehicules.csv");
 
     n_centres = centres.nbRows ;
@@ -50,12 +51,15 @@ function input() {
         node_index = node < n ? index_to_centre[node] : node - n + n_centres - 1 ;
 
         dist_from_depot[node] = matrix.rows[0][node_index+2] ;
+        time_from_depot[node] = matrix2.rows[0][node_index+2] ;
         dist_to_depot[node] = matrix.rows[node_index+1][1] ;
+        time_to_depot[node] = matrix2.rows[node_index+1][1] ;
 
         for [node2 in 0...n_nodes] {
             node_index2 = node2 < n ? index_to_centre[node2] : node2 - n + n_centres - 1 ;
             
             dist_matrix[node][node2] = matrix.rows[node_index+1][node_index2+2];
+            time_matrix[node][node2] = matrix2.rows[node_index+1][node_index2+2];
         }
     }
 
@@ -91,7 +95,7 @@ function input() {
     // When are we allowed to deliver each centre ?
     for [c in 0...n] {
         index = index_to_centre[c]+1 ;
-        jours = centres.rows[index][10].split(", ") ;
+        jours = centres.rows[index][10].replace(" ", "").split(",") ;
         j_de_livraison[c] = {};
         for [k in 0...jours.count()] {
             j_de_livraison[c].add(jours_map[jours[k]]);
@@ -143,6 +147,7 @@ function add_specific_requirements() {
             constraint visits_l[1][2][c] ;
             constraint n_livraisons[1][2] == 1 ;
             constraint n_ramasses[1][2] == 0 ;
+            constraint and[d in 0...n_days][v in 0...m : params["vehicle_allowed"][v] && (d!=1 || v!=2)](!visits_l[d][v][c]) ;
             break ;
         }
     }
@@ -217,46 +222,32 @@ function model() {
             constraint sum[p in 0...n_pdr](2 * visits_r[d][v][p]) <= sizes[v] ;
 
             // Deliver first, then pickup
-            route_dist[d][v] <- 
-                + (liv ?  dist_from_depot[livraisons[d][v][0]] 
+            route_dist[d][v] <- (liv ?  dist_from_depot[livraisons[d][v][0]] 
                         + sum(1...n_livraisons[d][v], i => dist_matrix[livraisons[d][v][i - 1]][livraisons[d][v][i]])
                         + (ram ? 
                             dist_matrix[livraisons[d][v][n_livraisons[d][v]-1]][ramasses[d][v][0] + n]
                             : dist_to_depot[livraisons[d][v][n_livraisons[d][v]-1]])
 
                         : (ram ? dist_from_depot[ramasses[d][v][0] + n] : 0)) 
-                + (ram ? dist_to_depot[ramasses[d][v][n_ramasses[d][v]-1] + n] : 0) 
-                        + sum(1...n_ramasses[d][v], i => dist_matrix[ramasses[d][v][i - 1] + n][ramasses[d][v][i] + n])
-                ;
+                    + (ram ? dist_to_depot[ramasses[d][v][n_ramasses[d][v]-1] + n]  
+                        + sum(1...n_ramasses[d][v], i => dist_matrix[ramasses[d][v][i - 1] + n][ramasses[d][v][i] + n]): 0)
+                    ;
 
-            // Constrain the estimated tour duration
-            // Based on a linear proxy from the tour length
-            // See fit_duration_proxy.jl
-            tour_duration[d][v] <- 
-                        params["duration_coefficients"][0] * 
-                                (route_dist[d][v] - (ram ? 
-                                    dist_to_depot[ramasses[d][v][n_ramasses[d][v]-1] + n] : 
-                                    (liv ? dist_to_depot[livraisons[d][v][n_livraisons[d][v]-1]] : 0))) + 
-                        params["duration_coefficients"][1] + 
-                        params["wait_at_centres"] * 60 * n_livraisons[d][v] +
-                        params["wait_at_pdrs"] * 60 * n_ramasses[d][v]
-                        ;
+            // Constrain the tour duration
+            local end_of_delivery_time <- (liv ? time_from_depot[livraisons[d][v][0]] 
+                                                    + sum(1...n_livraisons[d][v], i => time_matrix[livraisons[d][v][i - 1]][livraisons[d][v][i]])
+                                                    + params["wait_at_centres"] * 60 * n_livraisons[d][v]
+                                                    + (ram ? time_matrix[livraisons[d][v][n_livraisons[d][v]-1]][ramasses[d][v][0] + n] : 0)
+                                        : (ram ? time_from_depot[ramasses[d][v][0] + n] : 0))
+                                        ;
 
-            constraint tour_duration[d][v] <= params["max_tour_duration"] * 60 ;
+            local tour_duration <- end_of_delivery_time
+                    + (ram ? sum(1...n_ramasses[d][v], i => time_matrix[ramasses[d][v][i - 1] + n][ramasses[d][v][i] + n]) + params["wait_at_pdrs"] * 60 * n_ramasses[d][v] : 0)
+                    ;
+
+            constraint tour_duration <= params["max_tour_duration"] * 60 ;
+            // constraint iif(ram, end_of_delivery_time, 0) <= params["max_first_pickup_time"] * 60 ;
             constraint n_livraisons[d][v] + n_ramasses[d][v] <= params["max_stops"] ;
-
-            first_pickup_dist <- ram ? 
-                    (liv ? dist_from_depot[livraisons[d][v][0]] 
-                        + sum(1...n_livraisons[d][v], i => dist_matrix[livraisons[d][v][i - 1]][livraisons[d][v][i]])
-                        + (ram ? 
-                            dist_matrix[livraisons[d][v][n_livraisons[d][v]-1]][ramasses[d][v][0] + n]
-                            : dist_to_depot[livraisons[d][v][n_livraisons[d][v]-1]])
-                        : dist_from_depot[ramasses[d][v][0] + n] ) : 0 ;
-
-            first_pickup_time <- params["duration_coefficients"][0] * first_pickup_dist +
-                        params["duration_coefficients"][1] + 
-                        params["wait_at_centres"] * 60 * n_livraisons[d][v];
-            constraint first_pickup_time <= params["max_first_pickup_time"] * 60 ;
 
         }
 
@@ -274,7 +265,7 @@ function model() {
                 }
             }
             if (!allowed[d][c]) {
-                // println("Disallowing ", centres.rows[index_to_centre[c]+1][0]," on day ", d) ;
+                // println("Disallowing ", centres.rows[index_to_centre[c]+1][0]," on day ", d, " ",j_de_livraison[c]) ;
                 constraint sum[v in 0...m : params["vehicle_allowed"][v]](visits_l[d][v][c]) == 0 ;
             }
         }
@@ -306,12 +297,14 @@ function model() {
 
     // total_distance <- sum[d in 0...n_days][v in 0...m](route_dist[d][v]);
     fuel_consumption <- sum[d in 0...n_days][v in 0...m : params["vehicle_allowed"][v]](route_dist[d][v] * fuel[v] / 100000);
+    used[v in 0...m : params["vehicle_allowed"][v]] <- sum[d in 0...n_days](n_livraisons[d][v] + n_ramasses[d][v]) > 0 ;
+    n_used <- sum[v in 0...m : params["vehicle_allowed"][v]](used[v]) ;
+    total_cost <- fuel_consumption * params["fuel_cost"] + params["weekly_fixed_cost"] * n_used ;
 
-    // used[v in 0...m] <- sum[d in 0...n_days](n_livraisons[d][v] + n_ramasses[d][v]) > 0 ;
     // minimize sum[v in 0...m](used[v]);
     // constraint sum[v in 0...m](used[v]) <= 5;
 
-    minimize fuel_consumption ;
+    minimize total_cost ;
 
 }
 
@@ -600,7 +593,7 @@ function output(){
 
     write_solution();
 
-    println("\nTotal distance : ", sum[d in 0...n_days][v in 0...m](route_dist[d][v].value)/1000);
+    println("\nTotal distance : ", sum[d in 0...n_days][v in 0...m : params["vehicle_allowed"][v]](route_dist[d][v].value)/1000);
     println("Total fuel consumption : ", fuel_consumption.value);
 
 }
@@ -612,6 +605,10 @@ function callback(ls, cbType) {
         lastBestRunningTime = stats.runningTime;
         lastBestValue = obj.value;
         lastSolutionWritten = false ;
+
+        println(
+            "[   ", stats.runningTime, "s] : ", total_cost.value, "E    ", fuel_consumption.value, "L   ", n_used.value, " vehicles"
+        );
     }
     if (stats.runningTime - lastBestRunningTime > 5 && !lastSolutionWritten) {
         println(">>>>>>> No improvement during 5 seconds: writing current solution to file");
@@ -637,6 +634,7 @@ function main(args) {
 
     with(ls = localsolver.create()) {
         ls.addCallback("ITERATION_TICKED", callback);
+        ls.param.verbosity = 0 ;
 
         model();
 

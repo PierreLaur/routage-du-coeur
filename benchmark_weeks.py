@@ -1,11 +1,53 @@
 import pandas as pd
-from itertools import product
+from itertools import product, combinations
 from subprocess import Popen, PIPE
 from time import time
 from random import shuffle
+from utils.problem import read_problem
+from models.cp_solver import solve_vrp
 
 
-def bench_assignments():
+def bench_assignments_feasibility():
+
+    n_feasible = 0
+
+    assignments = list(combinations(range(8), 4))[
+        : len(list(combinations(range(8), 4))) // 2
+    ]
+    assignments = [[1 if i in a else 2 for i in range(8)] for a in assignments]
+
+    for i, a in enumerate(assignments):
+
+        print(f"\n - - - - Assignment {i+1}/{len(assignments)} - {n_feasible=}\n")
+
+        feasible = True
+        for week in [1, 2]:
+            problem = read_problem(
+                "data/centres_adjust_or_keep.xlsx",
+                "data/points_de_ramasse.xlsx",
+                "data/vehicules.xlsx",
+                "data/euclidean_matrix.xlsx",
+                "data/params.json",
+                week=week,
+                custom_assignment=a,
+            )
+
+            tours, obj = solve_vrp(
+                problem,
+                outfile="solutions/temp.json",
+                time_limit=5,
+                # violation_cost=1_000,
+            )
+            if tours == []:
+                feasible = False
+                break
+
+        if feasible:
+            n_feasible += 1
+            print(a, " is feasible")
+
+
+def bench_assignments_old():
     """Centres that are delivered every other week must be assigned to either week 1 or week 2
     This function generates all possible assignments of these centres, runs the solver for each one, and generates a
     assignments.csv file with the results"""
@@ -96,4 +138,4 @@ def bench_assignments():
 
 
 if __name__ == "__main__":
-    bench_assignments()
+    bench_assignments_feasibility()

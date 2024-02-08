@@ -4,13 +4,15 @@
     "n_norvegiennes": 26,
     "norvegienne_capacity": 40,
     "max_stops": 4,
-    "max_tour_duration": 180,
-    "max_first_pickup_time": 120,
+    "max_tour_duration": 210,
+    "max_first_pickup_time": 300,
     "wait_at_centres": 30,
     "wait_at_pdrs": 45,
-    "duration_coefficients": [0.0435, 556.89],
-    "week_assignments": [1, 2, 2, 2, 2, 1, 1, 1],
-    "vehicle_allowed": [1, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
+    "duration_coefficients": [0.03924972, 1281.7118127],
+    "week_assignments": [1, 1, 2, 1, 1, 1, 2, 2],
+    "vehicle_allowed": [1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0],
     "robustness_factor": 1.15,
-    "disallow_norvegiennes_in_PL": true
+    "disallow_norvegiennes_in_PL": true,
+    "weekly_fixed_cost": 15,
+    "fuel_cost": 1.8
 }
