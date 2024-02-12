@@ -97,7 +97,6 @@ Carrefour Supply Chain
 ## Jeudi
 
 Levignac
-Malepere
 Ramasse Leclerc St Orens
 Ramasse Super U Flourens
 92.8km

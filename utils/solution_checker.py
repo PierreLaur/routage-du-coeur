@@ -30,8 +30,10 @@ def check_solution_file(
         week,
     )
 
+    no_traffic_duration_matrix = pd.read_excel("data/duration_matrix.xlsx", index_col=0)
+
     warning_duration_threshold = (
-        180  # Show a warning if estimated duration for a tour is higher than this
+        200  # Show a warning if estimated duration for a tour is higher than this
     )
 
     obj = 0
@@ -142,13 +144,16 @@ def check_solution_file(
                     <= pb.sizes[v]
                 )
 
-                estimated_duration = sum(
-                    pb.duration_matrix.iloc[a, b]
-                    for a, b in zip(tours_flat[d, v][:-2], tours_flat[d, v][1:-1])
-                ) / 60 + sum(
-                    pb.wait_at_centres if c < pb.n else pb.wait_at_pdrs
-                    for c in tours_flat[d, v][1:-1]
-                )
+                estimated_duration = 0
+                for a, b in zip(tours_flat[d, v][:-2], tours_flat[d, v][1:-1]):
+                    if estimated_duration <= 90:
+                        estimated_duration += pb.duration_matrix.iloc[a, b] / 60
+                    else:
+                        estimated_duration += no_traffic_duration_matrix.iloc[a, b] / 60
+
+                    estimated_duration += (
+                        pb.wait_at_centres if b < pb.n else pb.wait_at_pdrs
+                    )
 
                 if estimated_duration > warning_duration_threshold:
                     print(
@@ -322,7 +327,7 @@ if __name__ == "__main__":
     week = int(sys.argv[2])
 
     check_solution_file(
-        "data/centres.xlsx",
+        "data/centres_keep.xlsx",
         "data/points_de_ramasse.xlsx",
         "data/vehicules.xlsx",
         "data/euclidean_matrix.xlsx",

@@ -1,5 +1,5 @@
 from ortools.sat.python import cp_model
-from math import inf
+from math import inf, ceil
 import json
 
 
@@ -224,6 +224,8 @@ def read_tours(pb, arcs, solver):
 
             tour.append(0)
 
+            if len(tour) == 2:
+                continue
             tours[d, v] = tour
     return tours
 
@@ -233,6 +235,9 @@ def write_sol(
     solver,
     total_distance,
     fuel_consumption,
+    total_cost,
+    tour_duration,
+    vehicles_used,
     tours,
     delivers,
     palettes,
@@ -245,11 +250,14 @@ def write_sol(
     sol = {
         "total_distance": total_distance,
         "fuel_consumption": round(fuel_consumption, 5),
+        "total_cost": total_cost,
+        "vehicles_used": vehicles_used,
     }
     sol["tours"] = {}
+    sol["tour_durations"] = {
+        str(d) + ", " + str(v): int(td) for (d, v), td in tour_duration.items()
+    }
     for (d, v), tour in tours.items():
-        if len(tour) == 2:
-            continue
 
         t = []
         for node in tour[1:-1]:
@@ -278,47 +286,79 @@ def write_sol(
 
 def post_process(
     pb,
-    solver,
     tours,
     delivers,
-    obj,
     palettes,
     demi_palettes,
     demi_palettes_s,
     norvegiennes,
+    tour_duration,
 ):
-    """Finds cities that are visited for no delivery and erases them from the tour
-    Returns the resulting tours and the objective"""
-    for d in range(pb.n_days):
-        for v in range(pb.m):
-            if len(tours[d, v]) == 1:
+    """Shaves any superfluous decisions (useless norvegiennes/palettes) from the solution
+    Also adds the time required to come back to the depot to the tour duration"""
+
+    for (d, v), tour in tours.items():
+
+        # Remove any useless norvegiennes and demi palettes for s products
+        for c in tour:
+            if (d, v, c) not in demi_palettes_s:
                 continue
 
-            i = 1
-            while i < len(tours[d, v]) - 1:
-                t = tours[d, v][i]
-                if t == 0 or t >= pb.n:
-                    i += 1
-                    continue
-                # If the city is visited for nothing, skip it and adjust the objective value
-                elif (
-                    sum(solver.Value(delivers[i][d, v, t]) for i in ["a", "f", "s"])
-                    == 0
-                ):
-                    obj = (
-                        obj
-                        - pb.distance_matrix.iloc[tours[d, v][i - 1], t]
-                        - pb.distance_matrix.iloc[t, tours[d, v][i + 1]]
-                        + pb.distance_matrix.iloc[
-                            tours[d, v][i - 1], tours[d, v][i + 1]
-                        ]
+            new_n_norvegiennes = max(
+                0,
+                ceil(
+                    (
+                        delivers["s"][d, v, c]
+                        - demi_palettes_s[d, v, c] * pb.demi_palette_capacity
                     )
-                    tours[d, v].pop(i)
-                    print(f"\rRe-optimized tours to {obj/1000:.2f}km", end="")
-                else:
-                    i += 1
-    print()
-    return tours, int(obj)
+                    / pb.norvegienne_capacity
+                ),
+            )
+            if norvegiennes[d, v, c] != new_n_norvegiennes:
+                norvegiennes[d, v, c] = new_n_norvegiennes
+
+            new_n_demi_palettes_s = max(
+                0,
+                ceil(
+                    (
+                        delivers["s"][d, v, c]
+                        - norvegiennes[d, v, c] * pb.norvegienne_capacity
+                    )
+                    / pb.demi_palette_capacity
+                ),
+            )
+
+            if demi_palettes_s[d, v, c] != new_n_demi_palettes_s:
+                demi_palettes_s[d, v, c] = new_n_demi_palettes_s
+
+        # Remove any useless palettes for f products
+        for c in tour:
+            if (d, v, c) not in demi_palettes:
+                continue
+
+            new_n_demi_palettes = max(
+                0,
+                ceil(delivers["f"][d, v, c] / pb.demi_palette_capacity),
+            )
+
+            if demi_palettes[d, v, c] != new_n_demi_palettes:
+                demi_palettes[d, v, c] = new_n_demi_palettes
+
+        # Remove any useless palettes for a products
+        for c in tour:
+            if (d, v, c) not in palettes:
+                continue
+
+            new_n_palettes = max(
+                0,
+                ceil(delivers["a"][d, v, c] / pb.max_palette_capacity),
+            )
+
+            if palettes[d, v, c] != new_n_palettes:
+                palettes[d, v, c] = new_n_palettes
+
+    for (d, v), duration in tour_duration.items():
+        tour_duration[d, v] += pb.duration_matrix.iloc[tours[d, v][-2], 0]
 
 
 def add_specific_requirements(pb, model: cp_model.CpModel, visits, arcs):
@@ -670,6 +710,7 @@ def solve_vrp(
 
     # Duration constraints
     route_dist = {}
+    tour_duration = {}
     for d in range(pb.n_days):
         for v in allowed_vehicles:
             vd = v + d * pb.m
@@ -680,7 +721,7 @@ def solve_vrp(
                 arc[2] * pb.distance_matrix.iloc[arc[0], arc[1]] for arc in vd_arcs
             )
 
-            tour_duration = (
+            tour_duration[d, v] = (
                 sum(
                     arc[2] * pb.duration_matrix.iloc[arc[0], arc[1]]
                     for arc in vd_arcs
@@ -693,7 +734,7 @@ def solve_vrp(
                 * 60
                 * sum(visits[d, v, p] for p in range(pb.n, pb.n + pb.n_pdr))
             )
-            model.Add(tour_duration <= pb.max_tour_duration * 60)
+            model.Add(tour_duration[d, v] <= pb.max_tour_duration * 60)
             model.Add(
                 sum(
                     visits[d, v, node]
@@ -744,10 +785,12 @@ def solve_vrp(
         * 0.00001
     )
 
-    obj = fuel_consumption * pb.fuel_cost + pb.weekly_fixed_cost * sum(used.values())
+    total_cost = fuel_consumption * pb.fuel_cost + pb.weekly_fixed_cost * sum(
+        used.values()
+    )
     if violation_cost:
-        obj += violation_cost * sum(violations.values())
-    model.Minimize(obj)
+        total_cost += violation_cost * sum(violations.values())
+    model.Minimize(total_cost)
 
     model.AddDecisionStrategy(
         [arcs[vd, a, b][2] for (vd, a, b) in arcs if a == 0],
@@ -769,6 +812,7 @@ def solve_vrp(
     solver.parameters.num_workers = 16
     # solver.parameters.use_lns_only = True
     # solver.parameters.min_num_lns_workers = 8
+
     if time_limit:
         solver.parameters.max_time_in_seconds = time_limit
 
@@ -786,20 +830,34 @@ def solve_vrp(
             if solver.Value(violations[c]):
                 print("Violation on centre ", c)
 
-    total_distance = solver.Value(total_distance)
     tours = read_tours(pb, arcs, solver)
+    total_distance = solver.Value(total_distance)
+    fuel_consumption = solver.Value(fuel_consumption)
+    total_cost = solver.Value(total_cost)
+    total_distance = solver.Value(total_distance)
+    vehicles_used = [
+        solver.Value(used[v]) if v in allowed_vehicles else 0 for v in range(pb.m)
+    ]
+    delivers = {
+        "a": {k: solver.Value(v) for k, v in delivers["a"].items()},
+        "f": {k: solver.Value(v) for k, v in delivers["f"].items()},
+        "s": {k: solver.Value(v) for k, v in delivers["s"].items()},
+    }
+    palettes = {k: solver.Value(v) for k, v in palettes.items()}
+    demi_palettes = {k: solver.Value(v) for k, v in demi_palettes.items()}
+    demi_palettes_s = {k: solver.Value(v) for k, v in demi_palettes_s.items()}
+    norvegiennes = {k: solver.Value(v) for k, v in norvegiennes.items()}
+    tour_duration = {k: solver.Value(v) for k, v in tour_duration.items() if k in tours}
 
-    # TODO : change fuel consumption as well here
-    tours, total_distance = post_process(
+    post_process(
         pb,
-        solver,
         tours,
         delivers,
-        total_distance,
         palettes,
         demi_palettes,
         demi_palettes_s,
         norvegiennes,
+        tour_duration,
     )
 
     if outfile:
@@ -807,7 +865,10 @@ def solve_vrp(
             pb,
             solver,
             total_distance,
-            solver.Value(fuel_consumption),
+            fuel_consumption,
+            total_cost,
+            tour_duration,
+            vehicles_used,
             tours,
             delivers,
             palettes,

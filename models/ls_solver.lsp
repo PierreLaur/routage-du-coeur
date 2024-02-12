@@ -13,7 +13,7 @@ function input() {
 
     params = json.parse("data/params.json") ;
     
-    centres = csv.parse("data/centres.csv");
+    centres = csv.parse("data/centres_keep.csv");
     pdr = csv.parse("data/points_de_ramasse.csv");
     matrix = csv.parse("data/euclidean_matrix.csv");
     matrix2 = csv.parse("data/duration_matrix_w_traffic.csv");
@@ -241,14 +241,14 @@ function model() {
                                         : (ram ? time_from_depot[ramasses[d][v][0] + n] : 0))
                                         ;
 
-            local tour_duration <- end_of_delivery_time
+            tour_duration[d][v] <- end_of_delivery_time
                     + (ram ? sum(1...n_ramasses[d][v], i => time_matrix[ramasses[d][v][i - 1] + n][ramasses[d][v][i] + n]) + params["wait_at_pdrs"] * 60 * n_ramasses[d][v] : 0)
                     ;
 
-            constraint tour_duration <= params["max_tour_duration"] * 60 ;
-            // constraint iif(ram, end_of_delivery_time, 0) <= params["max_first_pickup_time"] * 60 ;
+            constraint tour_duration[d][v] <= params["max_tour_duration"] * 60 ;
             constraint n_livraisons[d][v] + n_ramasses[d][v] <= params["max_stops"] ;
 
+            // constraint iif(ram, end_of_delivery_time, 0) <= params["max_first_pickup_time"] * 60 ;
         }
 
         constraint sum[c in 0...n][v in 0...m : params["vehicle_allowed"][v]](norvegiennes[d][v][c]) <= params["n_norvegiennes"] ;
@@ -430,7 +430,7 @@ function set_current_tours() {
     /* Constrains the solution to follow the current tours */
     current_tours = json.parse("data/tours_tournees_actuelles_w" + week + ".json");
     for [d in 0...n_days] {
-        for [v in 0...m] {
+        for [v in 0...m : params["vehicle_allowed"][v]] {
             key = "(" + d + ", " + v + ")" ;
             if (current_tours[key] == nil) {
                 constraint n_livraisons[d][v] == 0 ;
@@ -540,6 +540,17 @@ function write_solution() {
     sol = {};
     sol["total_distance"] = sum[d in 0...n_days][v in 0...m : params["vehicle_allowed"][v]](route_dist[d][v].value);
     sol["fuel_consumption"] = fuel_consumption.value;
+    sol["total_cost"] = total_cost.value;
+    sol["vehicles_used"] = {} ;
+    for [v in 0...m] {
+        if (params["vehicle_allowed"][v]) {
+            sol["vehicles_used"].add(used[v].value) ;
+        } else {
+            sol["vehicles_used"].add(0) ;
+        }
+    }
+    sol["tour_durations"] = {} ;
+
     sol["tours"] = {};
 
     for [d in 0...n_days] {
@@ -547,6 +558,12 @@ function write_solution() {
             if (livraisons[d][v].value.count() == 0 && ramasses[d][v].value.count() == 0) continue;
 
             key = d + ", " + v ;
+
+            sol["tour_durations"][key] = tour_duration[d][v].value ;
+            if (n_ramasses[d][v].value > 0) {
+                sol["tour_durations"][key] += time_to_depot[ramasses[d][v].value[n_ramasses[d][v].value-1]] ;
+            }
+
             sol["tours"][key] = {};
 
             for [node in livraisons[d][v].value] {
@@ -638,7 +655,7 @@ function main(args) {
 
         model();
 
-        // fix(0.4);
+        // fix(0.2);
         // set_current_tours();
 
         // set_initial_solution(true, nil);

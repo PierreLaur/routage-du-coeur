@@ -7,6 +7,7 @@ import yaml
 import argparse
 from dash import Dash, html, dcc
 import dash_bootstrap_components as dbc
+from datetime import date
 
 
 def make_dashboard(file, week, output_file):
@@ -441,6 +442,7 @@ def print_to_txt(file, week, output_file):
 
         total_distance = sol["total_distance"]
         fuel_consumption = sol["fuel_consumption"]
+        total_cost = sol["total_cost"]
         tours_strkey = sol["tours"]
         tours = {}
 
@@ -463,7 +465,9 @@ def print_to_txt(file, week, output_file):
                 if not (d, v) in tours:
                     continue
 
-                output += f"\tVéhicule {v} ({vehicles.index[v]}) \n"
+                est_time = sol["tour_durations"][str(d) + ", " + str(v)] / 60
+                est_time = f"{est_time//60:.0f}h{est_time%60:.0f}m"
+                output += f"\tVéhicule {v} ({vehicles.index[v]}) - est. {est_time}\n"
                 vehicles_used[d].append(vehicles.index[v])
                 tour = tours[d, v]
 
@@ -493,6 +497,7 @@ def print_to_txt(file, week, output_file):
 
                     output += f"\t\t{place['name']:40}\t{product_types}\t{palettes}\n"
 
+        output += f"\nCoût total : {total_cost:.2f}€"
         output += f"\nConsommation totale : {fuel_consumption:.2f}L"
         output += f"\nDistance totale : {round(total_distance/1000):d}km"
 
@@ -501,6 +506,8 @@ def print_to_txt(file, week, output_file):
             for v in vehicles.index
         }
         output += f"\nVéhicules utilisés : {' - '.join(f'{v} {k}' for k, v in vehicles_used.items())}"
+
+        output += f"\n\nDate : {date.today()}"
 
         with open(output_file, "w") as txt_file:
             txt_file.write(output)

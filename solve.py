@@ -25,7 +25,7 @@ if __name__ == "__main__":
         print("Please specify an output file")
         exit()
 
-    centres_file = "data/centres.xlsx"
+    centres_file = "data/centres_keep.xlsx"
 
     problem = read_problem(
         centres_file,
