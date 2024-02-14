@@ -1,5 +1,5 @@
 from utils.problem import Problem, read_problem
-from models.cp_solver import solve_vrp
+from models.cp_solver import solve_vrp, cluster_nodes
 import argparse
 
 
@@ -25,7 +25,7 @@ if __name__ == "__main__":
         print("Please specify an output file")
         exit()
 
-    centres_file = "data/centres_keep.xlsx"
+    centres_file = "data/centres.xlsx"
 
     problem = read_problem(
         centres_file,
@@ -37,4 +37,12 @@ if __name__ == "__main__":
         week=args.week,
     )
 
-    tours, obj = solve_vrp(problem, hint=infile, outfile=outfile, violation_cost=None)
+    # visits = cluster_nodes(problem)
+
+    tours, obj = solve_vrp(
+        problem,
+        hint=infile,
+        outfile=outfile,
+        violation_cost=None,
+        predefined_visits=None,
+    )

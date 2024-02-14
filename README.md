@@ -6,6 +6,12 @@ Optimisation des tournées de véhicules des Restos du Coeur de Haute-Garonne
 Solve (requires Hexaly solver) :  
 ```localsolver models/ls_solver.lsp <init solution file or "nil"> <output file path> <week number (1 or 2)>```
 
+With OR-Tools (CP-SAT solver) :  
+```python solve.py <week number (1 or 2)> --outfile <output file path>```  
+options :
+- ```--infile <init solution file>``` (set an initial solution)  
+- ```--improve <init solution file>``` (set a file as both input and output)
+
 Solution checker :  
 ```python utils/solution_checker.py <solution file> <week number (1 or 2)```
 

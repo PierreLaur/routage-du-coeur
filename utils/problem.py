@@ -30,7 +30,6 @@ class Problem:
     max_first_pickup_time: int
     wait_at_centres: int
     wait_at_pdrs: int
-    duration_coefficients: list[int]
     vehicle_allowed: list[bool]
     disallow_norvegiennes_in_PL: bool
     weekly_fixed_cost: float
@@ -151,7 +150,6 @@ def read_problem(
         params["max_first_pickup_time"],
         params["wait_at_centres"],
         params["wait_at_pdrs"],
-        params["duration_coefficients"],
         [bool(x) for x in params["vehicle_allowed"]],
         params["disallow_norvegiennes_in_PL"],
         params["weekly_fixed_cost"],
