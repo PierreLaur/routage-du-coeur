@@ -8,10 +8,8 @@
     "max_first_pickup_time": 300,
     "wait_at_centres": 30,
     "wait_at_pdrs": 45,
-    "week_assignments": [1, 1, 1, 1, 1, 1, 1, 1],
-    "vehicle_allowed": [1, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+    "week_assignments": [2, 1, 2, 1, 1, 1, 2, 2],
+    "vehicle_allowed": [1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0],
     "robustness_factor": 1.15,
-    "disallow_norvegiennes_in_PL": true,
-    "weekly_fixed_cost": 15,
     "fuel_cost": 1.8
 }

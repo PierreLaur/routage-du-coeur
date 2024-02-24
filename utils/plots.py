@@ -1,28 +1,28 @@
 import pandas as pd
-import sys
-import json
-from problem import Problem, read_problem
+from problem import Problem, Solution, Stop, StopType
 import folium
-import yaml
 import argparse
-from dash import Dash, html, dcc
+from dash import Dash, html
 import dash_bootstrap_components as dbc
 from datetime import date
 
 
-def make_dashboard(file, week, output_file):
-    def create_tour_card(name, tour):
-        card_items = []
+def make_dashboard(sol: Solution, output_file_path):
 
-        for item in tour:
-            if isinstance(item, dict):
-                tour_key, tour_info = list(item.items())[0]
-                palettes, quantities = tour_info["Palettes"], tour_info["Quantites"]
+    vehicles = pd.read_excel("data/vehicules.xlsx", index_col=0)
+    vehicle_names = vehicles.index
+
+    def create_tour_card(key, tour: list[Stop]):
+        card_items = []
+        vehicle_name = vehicle_names[key[1]]
+
+        for stop in tour:
+            if stop.type == StopType.Livraison:
                 card_items.append(
                     html.Tr(
                         [
                             html.Td(
-                                html.B(f"{tour_key}"),
+                                html.B(f"Livraison {stop.name}"),
                                 style={
                                     "width": "50%",
                                     "background-color": "#f0f0f0",
@@ -42,7 +42,7 @@ def make_dashboard(file, week, output_file):
                                                 ),
                                                 *[
                                                     html.Td(p, style={"width": "23%"})
-                                                    for p in palettes.split()
+                                                    for p in stop.palettes  # type: ignore
                                                 ],
                                             ]
                                         ),
@@ -57,7 +57,7 @@ def make_dashboard(file, week, output_file):
                                                 ),
                                                 *[
                                                     html.Td(q, style={"width": "23%"})
-                                                    for q in quantities.split()
+                                                    for q in stop.delivery  # type: ignore
                                                 ],
                                             ]
                                         ),
@@ -82,7 +82,8 @@ def make_dashboard(file, week, output_file):
                     html.Tr(
                         [
                             html.Td(
-                                html.B(item), style={"width": "50%", "height": "100%"}
+                                html.B(f"Ramasse {stop.name}"),
+                                style={"width": "50%", "height": "100%"},
                             ),
                             html.Td("", style={"width": "50%", "height": "100%"}),
                         ],
@@ -95,7 +96,8 @@ def make_dashboard(file, week, output_file):
                 [
                     dbc.Col(
                         html.B(
-                            f"{name}", style={"margin": "0 0 0 3px", "padding": "0"}
+                            f"{vehicle_name}",
+                            style={"margin": "0 0 0 3px", "padding": "0"},
                         ),
                         style={
                             "display": "flex",
@@ -121,519 +123,299 @@ def make_dashboard(file, week, output_file):
                 ],
             ),
             style={
-                "margin": "0px 1% 5px 1%",
-                "width": "98%",
+                "margin": "0px 0% 3px 0%",
+                "width": "100%",
                 "border": "1px solid black",
                 "overflow": "hidden",
             },
         )
 
-    def create_map(day):
-        return (
-            html.Iframe(
-                srcDoc=open(f"solutions/test_{day}.html", "r").read(),
-                style={
-                    "height": "100%",
-                    "width": "100%",
-                    "border": "1px solid black",
-                },
-            ),
-        )
-
     app = Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
 
-    data = yaml.safe_load(open(file))[f"Tournees Semaine {week}"]
-
-    days = []
     day_names = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi"]
-    for day in day_names:
-        vehicules = []
-        for k, v in data["Tournees"][day].items():
-            card = create_tour_card(k, v)
-            vehicules.append(card)
-        days.append(
+    tour_cards = {}
+    for (d, v), tour in sol.tours.items():
+        tour_cards[d, v] = create_tour_card((d, v), tour)
+
+    days = [
+        html.Div(
             [
                 html.H5(
                     children=f"{day}",
                     style={"text-align": "center", "font-weight": "bold"},
                 ),
-                *vehicules,
+                dbc.Row(
+                    [
+                        dbc.Col(),
+                        dbc.Col(children=["A"], width=1, style={"margin-right": "7px"}),
+                        dbc.Col(children=["F"], width=1, style={"margin-right": "5px"}),
+                        dbc.Col(
+                            children=["S"], width=2, style={"margin-right": "-7px"}
+                        ),
+                    ]
+                ),
+                *[tour_cards[d, v] for (d2, v) in tour_cards if d2 == d],
             ]
         )
+        for d, day in enumerate(day_names)
+    ]
 
-    plot_solution("solutions/week_1.json", 1, "solutions/test_2.html", 1)
+    infos = dbc.Card(
+        [
+            html.H4(f"Date : {date.today()}"),
+            html.H4(f""),
+            html.H4(f"Semaine : {sol.week}"),
+            html.H4(
+                f"Coûts totaux : {sol.total_costs:.0f}€     (Fixes {sol.fixed_costs:.0f} | Variables {sol.variable_costs:.0f})"
+            ),
+            html.H4(f"Distance totale : {sol.total_distance/1000:.0f}km"),
+            html.H4(f"Véhicules : {sum(sol.vehicles_used)}"),
+        ],
+        outline=True,
+        style={"border": "none", "margin-top": "20%"},
+    )
 
     app.layout = html.Div(
         [
             dbc.Row(
                 [
                     dbc.Col(
-                        days[0],
+                        [days[0], days[3]],
                         width=4,
                         style={
                             # "border": "1px solid #ddd",
-                            "padding": "0px"
+                            "padding-left": "15px",
+                            "height": "100%",
                         },
                     ),
                     dbc.Col(
-                        days[1],
-                        width=4,
-                        style={
-                            # "border": "1px solid #ddd",
-                            "padding": "0px"
-                        },
-                    ),
-                    dbc.Col(
-                        days[2],
-                        width=4,
-                        style={
-                            # "border": "1px solid #ddd",
-                            "padding": "0px"
-                        },
-                    ),
-                ],
-                className="grid-container",
-                style={"height": "30%", "margin": "0px"},
-            ),
-            dbc.Row(
-                [
-                    dbc.Col(
-                        create_map(1),
-                        width=4,
-                        style={"margin": "0px", "padding": "0px"},
-                    ),
-                    dbc.Col(
-                        create_map(2),
-                        width=4,
-                        style={"margin": "0px", "padding": "0px"},
-                    ),
-                    dbc.Col(
-                        create_map(1),
-                        width=4,
-                        style={"margin": "0px", "padding": "0px"},
-                    ),
-                ],
-                style={"height": "20%", "margin": "0px"},
-            ),
-            dbc.Row(
-                [
-                    dbc.Col(
-                        days[3],
+                        [days[1], days[4]],
                         width=4,
                         style={
                             # "border": "1px solid #ddd",
                             "padding": "0px",
+                            "height": "100%",
                         },
                     ),
                     dbc.Col(
-                        days[4],
+                        [days[2], infos],
                         width=4,
                         style={
                             # "border": "1px solid #ddd",
-                            "padding": "0px",
-                        },
-                    ),
-                    dbc.Col(
-                        "infos",
-                        width=4,
-                        style={
-                            # "border": "1px solid #ddd",
-                            "padding": "0px",
+                            "padding-right": "15px",
+                            "height": "100%",
                         },
                     ),
                 ],
-                className="grid-container",
-                style={"height": "30%", "margin": "0px"},
-            ),
-            dbc.Row(
-                [
-                    dbc.Col(
-                        create_map(1),
-                        width=4,
-                        style={"margin": "0px", "padding": "0px"},
-                    ),
-                    dbc.Col(
-                        create_map(1),
-                        width=4,
-                        style={"margin": "0px", "padding": "0px"},
-                    ),
-                    dbc.Col(
-                        "",
-                        width=4,
-                        style={"margin": "0px", "padding": "0px"},
-                    ),
-                ],
-                style={"height": "20%", "margin": "0px"},
-            ),
+                style={
+                    "height": "100%",
+                    "width": "100%",
+                    "padding": "0",
+                    "margin": "0",
+                },
+            )
         ],
         style={
-            "height": "2100px",
+            "height": "1050px",
             "width": "1485px",
-            "margin": "10px",
+            "margin": "0",
             "padding": "0",
             "fontSize": 11,
             "border": "1px solid black",
         },
     )
-    app.run(debug=True)
+    app.run(debug=False)
 
 
-def print_to_yaml(file, week, output_file):
-    """Prints the solution to a yaml file"""
-    with open(file) as f:
-        sol = json.load(f)
-
-        centres = pd.read_excel("data/centres.xlsx")
-        vehicles = pd.read_excel("data/vehicules.xlsx", index_col=0)
-
-        pb = read_problem(
-            "data/centres.xlsx",
-            "data/points_de_ramasse.xlsx",
-            "data/vehicules.xlsx",
-            "data/euclidean_matrix.xlsx",
-            "data/duration_matrix_w_traffic.xlsx",
-            "data/params.json",
-            week,
-        )
-
-        total_distance = sol["total_distance"]
-        fuel_consumption = sol["fuel_consumption"]
-        tours_strkey = sol["tours"]
-        tours = {}
-
-        for key, tour in tours_strkey.items():
-            d, v = map(int, key.split(", "))
-            tours[d, v] = tour
-
-        jours_map = {0: "Lundi", 1: "Mardi", 2: "Mercredi", 3: "Jeudi", 4: "Vendredi"}
-        names_short = [
-            "Toulouse/Seminaire",
-            "Auterive",
-            "Bagneres de Luchon",
-            "Bessieres",
-            "Blagnac",
-            "Carbonne",
-            "Cazeres",
-            "Cugnaux",
-            "Escalquens",
-            "Fenouillet",
-            "Fonsorbes",
-            "Fronton",
-            "L Isle en Dodon",
-            "Leguevin",
-            "Levignac",
-            "Montrejeau",
-            "Muret",
-            "Pibrac",
-            "Plaisance du Touch",
-            "Portet sur Garonne",
-            "Revel",
-            "Rieumes",
-            "Saint-Gaudens",
-            "Salies du Salat/Mane",
-            "Toulouse/Casselardit",
-            "Toulouse/Malepere",
-            "Toulouse/Negogousses",
-            "Tournefeuille",
-            "Villef. de Lauragais",
-            "Auchan Gramont",
-            "Leclerc St Orens",
-            "Super U Flourens",
-            "Leclerc Blagnac",
-            "Leclerc Rouffiac",
-            "Carrefour Centrale",
-        ]
-
-        vehicles_used = {}
-        days = {}
-        for d in range(pb.n_days):
-            vehicles_used[d] = []
-            if not any((d, v) in tours for v in range(pb.m)):
-                continue
-
-            days[jours_map[d]] = {}
-            index_vehicule = 1
-            for v in range(pb.m):
-                if not (d, v) in tours:
-                    continue
-
-                vehicles_used[d].append(vehicles.index[v])
-                tour = tours[d, v]
-
-                tour_list = []
-                for place in tour:
-                    product_types = ""
-                    palettes = ""
-                    quantities = ""
-                    if place["type"] == "livraison":
-                        for i, product_type in enumerate("AFS"):
-                            if place["delivery"][i] > 0:
-                                quantities += (
-                                    f" {str(place['delivery'][i])+product_type:>5}"
-                                )
-                                product_types += product_type
-                            else:
-                                quantities += "     "
-
-                        pals = place["palettes"]
-                        palettes = f"  {str(pals[0])+'A':>5}" if pals[0] else "      "
-                        pals[1] = pals[1] / 2 if pals[1] % 2 != 0 else pals[1] // 2
-                        palettes += f"{str(pals[1])+'F':>6}" if pals[1] else "     "
-                        pals[2] = pals[2] / 2 if pals[2] % 2 != 0 else pals[2] // 2
-                        palettes += f"{str(pals[2])+'S':>6}" if pals[2] else "     "
-                        palettes += (
-                            f"  +{place['norvegiennes']} norvegienne{'s' if place['norvegiennes'] > 1 else ''}"
-                            if place["norvegiennes"]
-                            else ""
-                        )
-                        tour_list.append(
-                            {
-                                f"Livraison - {names_short[place['index']]} {product_types}": {
-                                    "Quantites": quantities,
-                                    "Palettes": palettes,
-                                }
-                            }
-                        )
-                    else:
-                        tour_list.append(
-                            f"Ramasse - {names_short[place['index']]}",
-                        )
-
-                days[jours_map[d]][
-                    f"{vehicles.index[v]} {vehicles_used[d].count(vehicles.index[v])}"
-                ] = tour_list
-
-        vehicles_used = {
-            v: max(vehicles_used[d].count(v) for d in range(pb.n_days))
-            for v in vehicles.index
-        }
-
-        output = {
-            f"Tournees Semaine {week}": {
-                "Consommation totale": f"{fuel_consumption:.2f}L",
-                "Distance totale": f"{round(total_distance/1000):d}km",
-                "Vehicules": " - ".join(f"{v} {k}" for k, v in vehicles_used.items()),
-                "Tournees": days,
-            }
-        }
-
-        with open(output_file, "w") as yaml_data:
-            yaml.dump(output, yaml_data, default_flow_style=False)
-            yaml.dump(output, sys.stdout, default_flow_style=False)
-
-
-def print_to_txt(file, week, output_file):
+def print_to_txt(sol: Solution, output_file_path):
     """Generates a pretty printed txt version of the solution and prints it to a specified file"""
-    with open(file) as f:
-        sol = json.load(f)
 
-        centres = pd.read_excel("data/centres.xlsx")
-        vehicles = pd.read_excel("data/vehicules.xlsx", index_col=0)
+    vehicles = pd.read_excel("data/vehicules.xlsx", index_col=0)
+    vehicle_names = vehicles.index
 
-        pb = read_problem(
-            "data/centres.xlsx",
-            "data/points_de_ramasse.xlsx",
-            "data/vehicules.xlsx",
-            "data/euclidean_matrix.xlsx",
-            "data/duration_matrix_w_traffic.xlsx",
-            "data/params.json",
-            week,
-        )
+    jours_map = {0: "Lundi", 1: "Mardi", 2: "Mercredi", 3: "Jeudi", 4: "Vendredi"}
 
-        total_distance = sol["total_distance"]
-        fuel_consumption = sol["fuel_consumption"]
-        total_cost = sol["total_cost"]
-        tours_strkey = sol["tours"]
-        tours = {}
+    output = ""
+    output += f"- - - - - - TOURNEES SEMAINE {sol.week} - - - - - -\n"
 
-        for key, tour in tours_strkey.items():
-            d, v = map(int, key.split(", "))
-            tours[d, v] = tour
+    n_days = len(set(k[0] for k in sol.tours))
 
-        jours_map = {0: "Lundi", 1: "Mardi", 2: "Mercredi", 3: "Jeudi", 4: "Vendredi"}
+    for d in range(n_days):
+        if not any(d2 == d for (d2, v) in sol.tours):
+            continue
 
-        output = ""
-        output += f"- - - - - - TOURNEES SEMAINE {week} - - - - - -\n"
-        vehicles_used = {}
-        for d in range(pb.n_days):
-            vehicles_used[d] = []
-            if not any((d, v) in tours for v in range(pb.m)):
-                continue
+        output += f"\n- - - - {jours_map[d].upper()} - - - -\n\n"
+        day_tours = {v: tour for (d2, v), tour in sol.tours.items() if d2 == d}
+        for v, tour in day_tours.items():
 
-            output += f"\n- - - - {jours_map[d].upper()} - - - -\n\n"
-            for v in range(pb.m):
-                if not (d, v) in tours:
-                    continue
-
-                est_time = sol["tour_durations"][str(d) + ", " + str(v)] / 60
+            if sol.tour_durations_adjusted:
+                est_time = sol.tour_durations_adjusted[d, v]
+            else:
+                est_time = sol.tour_durations[d, v] / 60
                 est_time = f"{est_time//60:.0f}h{est_time%60:.0f}m"
-                output += f"\tVéhicule {v} ({vehicles.index[v]}) - est. {est_time}\n"
-                vehicles_used[d].append(vehicles.index[v])
-                tour = tours[d, v]
+            output += f"\tVéhicule {v} ({vehicle_names[v]}) - est. {est_time}\n"
 
-                for place in tour:
-                    product_types = ""
-                    palettes = ""
-                    if place["type"] == "livraison":
-                        for i, product_type in enumerate("AFS"):
-                            if place["delivery"][i] > 0:
-                                product_types += (
-                                    f"{str(place['delivery'][i])+product_type:5}"
-                                )
-                            else:
-                                product_types += f"{'':5}"
+            for stop in tour:
+                product_types = ""
+                palettes = ""
+                if stop.type == StopType.Livraison:
+                    for i, product_type in enumerate("AFS"):
+                        deliv = stop.delivery[i]
+                        if deliv > 0:
+                            product_types += f"{f'{deliv}'+product_type:5}"
+                        else:
+                            product_types += f"{'':5}"
 
-                        pals = place["palettes"]
-                        palettes = f"{pals[0]}PA" if pals[0] else "   "
-                        palettes += f" {pals[1]/2:.1f}PF" if pals[1] else "      "
-                        palettes += f" {pals[2]/2:.1f}PS" if pals[2] else "      "
-                        palettes += (
-                            f" +{place['norvegiennes']} norvégienne{'s' if place['norvegiennes'] > 1 else ''}"
-                            if place["norvegiennes"]
-                            else ""
-                        )
-                    else:
-                        product_types = "Ramasse"
+                    pals = stop.palettes
+                    palettes = f"{pals[0]}PA" if pals[0] else "   "
+                    palettes += f" {pals[1]:.1f}PF" if pals[1] else "      "
+                    palettes += f" {pals[2]:.1f}PS" if pals[2] else "      "
+                    palettes += (
+                        f" +{stop.norvegiennes} norvégienne{'s' if stop.norvegiennes > 1 else ''}"
+                        if stop.norvegiennes > 0
+                        else ""
+                    )
+                else:
+                    product_types = "Ramasse"
 
-                    output += f"\t\t{place['name']:40}\t{product_types}\t{palettes}\n"
+                output += f"\t\t{stop.name:40}\t{product_types}\t{palettes}\n"
 
-        output += f"\nCoût total : {total_cost:.2f}€"
-        output += f"\nConsommation totale : {fuel_consumption:.2f}L"
-        output += f"\nDistance totale : {round(total_distance/1000):d}km"
+    output += f"\nCoûts totaux : {sol.total_costs:.0f}€     (Fixes {sol.fixed_costs:.0f}€ | Variables {sol.variable_costs:.0f}€)"
+    output += f"\nDistance totale : {round(sol.total_distance/1000):d}km"
 
-        vehicles_used = {
-            v: max(vehicles_used[d].count(v) for d in range(pb.n_days))
-            for v in vehicles.index
-        }
-        output += f"\nVéhicules utilisés : {' - '.join(f'{v} {k}' for k, v in vehicles_used.items())}"
+    vehicles_used = vehicles.index.where(sol.vehicles_used)
+    output += f"\nVéhicules utilisés : {' - '.join(f'{v} {k}' for k, v in vehicles_used.value_counts().items())}"
 
-        output += f"\n\nDate : {date.today()}"
+    output += f"\n\nDate : {date.today()}"
 
-        with open(output_file, "w") as txt_file:
-            txt_file.write(output)
-        print(output)
+    with open(output_file_path, "w") as txt_file:
+        txt_file.write(output)
+
+    print(output)
+    print(f"Wrote solution to {output_file_path}")
 
 
-def plot_solution(file, week, output_file, specific_day=None):
-    """Makes a folium plot of the solution and saves it to a specified file"""
-    with open(file) as f:
-        sol = json.load(f)
+def plot_solution(sol: Solution, output_file_path=None, day=None, silent=False):
+    """Makes a folium plot of the solution
+    If output_file_path, writes it to the specified file
+    If day, only plots the tours for the specified day"""
 
-        centres = pd.read_excel("data/centres.xlsx")
-        vehicles = pd.read_excel("data/vehicules.xlsx", index_col=0)
-        pdr = pd.read_excel("data/points_de_ramasse.xlsx")
+    centres = pd.read_excel("data/centres.xlsx")
+    vehicles = pd.read_excel("data/vehicules.xlsx", index_col=0)
+    pdr = pd.read_excel("data/points_de_ramasse.xlsx")
 
-        pb = read_problem(
-            "data/centres.xlsx",
-            "data/points_de_ramasse.xlsx",
-            "data/vehicules.xlsx",
-            "data/euclidean_matrix.xlsx",
-            "data/duration_matrix_w_traffic.xlsx",
-            "data/params.json",
-            week,
-        )
+    n_centres = len(centres.index)
+    n_pdr = len(pdr.index)
+    m = len(vehicles.index)
+    n_days = 5
 
-        jours_map = {0: "Lundi", 1: "Mardi", 2: "Mercredi", 3: "Jeudi", 4: "Vendredi"}
-        colors = [
-            "red",
-            "orange",
-            "grey",
-            "blue",
-            "darkblue",
-            "black",
-            "purple",
-            "green",
-            "darkgreen",
-            "white",
-            "white",
-            "white",
-        ]
+    jours_map = {0: "Lundi", 1: "Mardi", 2: "Mercredi", 3: "Jeudi", 4: "Vendredi"}
+    colors = [
+        "red",
+        "orange",
+        "grey",
+        "blue",
+        "darkblue",
+        "black",
+        "purple",
+        "green",
+        "darkgreen",
+        "white",
+        "white",
+        "white",
+    ]
 
-        lats = centres["Latitude"].tolist() + pdr["Latitude"].tolist()
-        longs = centres["Longitude"].tolist() + pdr["Longitude"].tolist()
-        coords_depot = (lats[0], longs[0])
+    lats = centres["Latitude"].tolist() + pdr["Latitude"].tolist()
+    longs = centres["Longitude"].tolist() + pdr["Longitude"].tolist()
+    coords_depot = (lats[0], longs[0])
 
-        obj = sol["total_distance"]
-        tours_strkey = sol["tours"]
-        tours = {}
+    folmap = folium.Map(
+        tiles="CartoDB Positron",
+        location=(lats[0], longs[0]),
+        max_bounds=True,
+        min_lat=min(lats) - 0.5,
+        max_lat=max(lats) + 0.5,
+        min_lon=min(longs) - 1,
+        max_lon=max(longs) + 1,
+    )
 
-        for key, tour in tours_strkey.items():
-            d, v = map(int, key.split(", "))
-            tours[d, v] = tour
+    # Add the centres and points de ramasse as markers
+    for i in range(n_centres):
+        folium.CircleMarker(
+            location=(lats[i], longs[i]),
+            tooltip=centres["Nom"][i],
+            color="green" if i == 0 else "red",
+        ).add_to(folmap)
 
-        m = folium.Map(
-            tiles="CartoDB Positron",
-            location=(lats[0], longs[0]),
-            max_bounds=True,
-            min_lat=min(lats) - 0.5,
-            max_lat=max(lats) + 0.5,
-            min_lon=min(longs) - 1,
-            max_lon=max(longs) + 1,
-        )
+    for i in range(n_pdr):
+        folium.CircleMarker(
+            location=(lats[n_centres + i], longs[n_centres + i]),
+            tooltip=pdr["Nom"][i],
+            color="blue",
+        ).add_to(folmap)
 
-        week = int(week)
+    # Add the tours
+    days_to_plot = [day] if day is not None else range(n_days)
 
-        # Add the centres and points de ramasse as markers
-        for i in range(len(centres)):
-            folium.CircleMarker(
-                location=(lats[i], longs[i]),
-                tooltip=centres["Nom"][i],
-                color="green" if i == 0 else "red",
-            ).add_to(m)
-        for i in range(len(pdr)):
-            folium.CircleMarker(
-                location=(lats[pb.n + i], longs[pb.n + i]),
-                tooltip=pdr["Nom"][i],
-                color="blue",
-            ).add_to(m)
+    group = {d: folium.FeatureGroup(jours_map[d]).add_to(folmap) for d in days_to_plot}
 
-        vehicles_used = {}
-        days_to_plot = [specific_day] if specific_day is not None else range(pb.n_days)
-        for d in days_to_plot:
-            vehicles_used[d] = []
-            if not any((d, v) in tours for v in range(pb.m)):
-                continue
+    for (d, v), tour in sol.tours.items():
+        if d not in days_to_plot:
+            continue
 
-            group = folium.FeatureGroup(jours_map[d]).add_to(m)
+        tour_coords = []
+        for stop in tour:
+            tour_coords.append((lats[stop.index], longs[stop.index]))
+        tour_coords = [coords_depot] + tour_coords + [coords_depot]
 
-            for v in range(pb.m):
-                if not (d, v) in tours:
-                    continue
+        folium.PolyLine(
+            tour_coords,
+            tooltip=f"Véhicule {v} ({vehicles.index[v]})",
+            color=colors[v],
+        ).add_to(group[d])
 
-                vehicles_used[d].append(vehicles.index[v])
-                tour = tours[d, v]
+    folium.LayerControl().add_to(folmap)
 
-                tour_coords = []
-                for place in tour:
-                    index, name = place["index"], place["name"]
-                    tour_coords.append((lats[index], longs[index]))
-                tour_coords = [coords_depot] + tour_coords + [coords_depot]
+    if output_file_path:
+        folmap.save(output_file_path)
+        if not silent:
+            print("Map saved to ", output_file_path)
 
-                folium.PolyLine(
-                    tour_coords,
-                    tooltip=f"Véhicule {v} ({vehicles.index[v]})",
-                    color=colors[v],
-                ).add_to(group)
-
-        folium.LayerControl().add_to(m)
-
-        m.save(output_file)
-        print("Map saved to ", output_file)
-
-        return m
+    return m
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("infile", type=str, help="json solution file")
-    parser.add_argument("week", type=int, help="week number (1 or 2)")
-    parser.add_argument("outfile", type=str, help="desired output file path")
+    parser.add_argument(
+        "--map",
+        "-m",
+        action="store_true",
+        help="make a html map",
+    )
+    parser.add_argument(
+        "--txt",
+        "-t",
+        action="store_true",
+        help="make a txt file",
+    )
+    parser.add_argument(
+        "--dashboard",
+        "-d",
+        action="store_true",
+        help="make a dashboard",
+    )
 
     args = parser.parse_args()
 
-    file_name = args.outfile.split(".")[0]
+    file_name = args.infile.split(".")[0]
+    sol = Solution.read_from_json(args.infile)
 
-    # plot_solution(args.infile, args.week, file_name + ".html")
-    print_to_txt(args.infile, args.week, file_name + ".txt")
-    # print_to_yaml(args.infile, args.week, file_name + ".yaml")
-    # make_dashboard("solutions/week_1.yaml", 1, "dashboard.html")
+    if args.txt:
+        print_to_txt(sol, file_name + ".txt")
+
+    if args.map:
+        plot_solution(sol, file_name + ".html")
+
+    if args.dashboard:
+        make_dashboard(sol, file_name + ".html")

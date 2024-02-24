@@ -12,14 +12,9 @@ options :
 - ```--infile <init solution file>``` (set an initial solution)  
 - ```--improve <init solution file>``` (set a file as both input and output)
 
-Solution checker :  
-```python utils/solution_checker.py <solution file> <week number (1 or 2)```
+Print the solution as txt file/html map/dashboard :  
+```python utils/plots.py <solution file> <-t> <-m> <-d>```
 
-Print the solution as txt + yaml + html interactive map :  
-```python utils/plots.py <solution file> <week number (1 or 2) <output file>```
-
-[Example Solution](solutions/week_1.yaml)  
-[Example html](solutions/week_1.html)  
-  
-Example (partial) Plot :  
-![tours plot example](solutions/tours.jpg)
+[Example Solution](solutions/test.txt)  
+[Example map](solutions/test.html)  
+[Example dashboard](solutions/test.pdf)  

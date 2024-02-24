@@ -5,7 +5,7 @@ Ramasse Leclerc St Orens
 Ramasse Super U Flourens
 39.7km
 
-Négogousses
+Négogousses         -> en fait non ? à vérifier
 Ramasse Leclerc Blagnac
 33.9km
 
@@ -93,6 +93,8 @@ Carrefour Supply Chain
 
 Carrefour Supply Chain
 39km
+
++ livraison les Arènes ? à vérifier
 
 ## Jeudi
 

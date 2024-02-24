@@ -1,0 +1,105 @@
+- - - - - - TOURNEES SEMAINE 1 - - - - - -
+
+- - - - LUNDI - - - -
+
+	Véhicule 2 (Camion Frigo) - est. 4h17min
+		Toulouse/Negogousses(Les Arenes)        	1024A348F      	2PA 0.5PF      
+		Toulouse/Malepere                       	          1S   	          0.5PS
+		Leclerc St Orens                        	Ramasse	
+		Super U Flourens                        	Ramasse	
+	Véhicule 3 (Camion Frigo) - est. 5h17min
+		Tournefeuille                           	600A           	1PA            
+		L Isle en Dodon                         	90A  334F 46S  	1PA 0.5PF       +2 norvégiennes
+		Montrejeau                              	98A  106F 35S  	1PA 0.5PF       +1 norvégienne
+	Véhicule 4 (Camion Frigo) - est. 3h42min
+		Cazeres                                 	160A 115F 35S  	1PA 0.5PF 0.5PS
+		Salies du Salat/Mane                    	328A 298F 64S  	1PA 0.5PF 0.5PS
+	Véhicule 5 (Camion Frigo) - est. 4h2min
+		Bessieres                               	555A 252F 64S  	1PA 0.5PF 0.5PS
+		Leclerc Rouffiac                        	Ramasse	
+		Leclerc Blagnac                         	Ramasse	
+
+- - - - MARDI - - - -
+
+	Véhicule 2 (Camion Frigo) - est. 2h33min
+		Revel                                   	286A 280F 73S  	1PA 0.5PF 0.5PS
+	Véhicule 3 (Camion Frigo) - est. 1h33min
+		Leclerc Rouffiac                        	Ramasse	
+	Véhicule 4 (Camion Frigo) - est. 4h17min
+		Toulouse/Grande-Bretagne(Casselardit)   	     889F 174S 	    1.5PF 0.5PS
+		Toulouse/Malepere                       	          1S   	          0.5PS
+		Leclerc St Orens                        	Ramasse	
+		Super U Flourens                        	Ramasse	
+	Véhicule 5 (Camion Frigo) - est. 2h21min
+		Fenouillet                              	118A 189F 35S  	1PA 0.5PF 0.5PS
+		Fronton                                 	516A 287F 75S  	1PA 0.5PF 0.5PS
+	Véhicule 6 (Camion Frigo) - est. 3h57min
+		Villefranche de Lauragais               	91A  196F 35S  	1PA 0.5PF       +1 norvégienne
+		Carbonne                                	351A 145F 35S  	1PA 0.5PF       +1 norvégienne
+		Portet sur Garonne                      	     274F 103S 	    0.5PF 0.5PS
+
+- - - - MERCREDI - - - -
+
+	Véhicule 0 (Poids Lourd) - est. 3h41min
+		Toulouse/Malepere                       	4933A          	7PA            
+		Portet sur Garonne                      	731A           	1PA            
+		Carrefour Supply Chain (A)              	Ramasse	
+	Véhicule 2 (Camion Frigo) - est. 2h41min
+		Pibrac                                  	575A 427F 314S 	1PA 1.0PF 0.5PS
+		Carrefour Supply Chain                  	Ramasse	
+	Véhicule 3 (Camion Frigo) - est. 1h19min
+		Blagnac                                 	701A 429F 99S  	1PA 1.0PF 0.5PS
+	Véhicule 4 (Camion Frigo) - est. 2h31min
+		Leclerc Rouffiac                        	Ramasse	
+		Auchan Gramont                          	Ramasse	
+	Véhicule 5 (Camion Frigo) - est. 2h33min
+		Fonsorbes                               	516A 287F 75S  	1PA 0.5PF 0.5PS
+		Tournefeuille                           	81A  406F 35S  	1PA 1.0PF       +1 norvégienne
+	Véhicule 6 (Camion Frigo) - est. 3h16min
+		Toulouse/Malepere                       	     964F 195S 	    1.5PF 0.5PS
+		Leclerc St Orens                        	Ramasse	
+		Super U Flourens                        	Ramasse	
+
+- - - - JEUDI - - - -
+
+	Véhicule 2 (Camion Frigo) - est. 2h46min
+		Escalquens                              	1136A136F 106S 	2PA 0.5PF 0.5PS
+		Super U Flourens                        	Ramasse	
+	Véhicule 3 (Camion Frigo) - est. 2h37min
+		Escalquens                              	1A   665F 3S   	1PA 1.0PF 0.5PS
+		Leclerc St Orens                        	Ramasse	
+	Véhicule 4 (Camion Frigo) - est. 2h33min
+		Plaisance du Touch                      	252A 99F  35S  	1PA 0.5PF       +1 norvégienne
+		Toulouse/Negogousses(Les Arenes)        	     770F 80S  	    1.5PF       +2 norvégiennes
+	Véhicule 5 (Camion Frigo) - est. 3h24min
+		Leguevin                                	196A 121F 35S  	1PA 0.5PF 0.5PS
+		Pibrac                                  	1048A          	2PA            
+		Leclerc Blagnac                         	Ramasse	
+
+- - - - VENDREDI - - - -
+
+	Véhicule 2 (Camion Frigo) - est. 3h41min
+		Muret                                   	291A 434F 78S  	1PA 1.0PF 0.5PS
+		Pibrac                                  	     594F      	    1.0PF      
+		Carrefour Supply Chain                  	Ramasse	
+	Véhicule 3 (Camion Frigo) - est. 2h59min
+		Toulouse/Negogousses(Les Arenes)        	1114A     285S 	2PA             +8 norvégiennes
+		Toulouse/Grande-Bretagne(Casselardit)   	          1S   	                +1 norvégienne
+		Leclerc Blagnac                         	Ramasse	
+	Véhicule 4 (Camion Frigo) - est. 3h55min
+		Saint-Gaudens                           	467A 375F 35S  	1PA 1.0PF 0.5PS
+		Auterive                                	133A 103F 64S  	1PA 0.5PF       +2 norvégiennes
+	Véhicule 5 (Camion Frigo) - est. 4h17min
+		Toulouse/Grande-Bretagne(Casselardit)   	705A           	1PA            
+		Toulouse/Malepere                       	          1S   	          0.5PS
+		Leclerc St Orens                        	Ramasse	
+		Super U Flourens                        	Ramasse	
+	Véhicule 6 (Camion Frigo) - est. 2h31min
+		Leclerc Rouffiac                        	Ramasse	
+		Auchan Gramont                          	Ramasse	
+
+Coûts totaux : 547€     (Fixes 30€ | Variables 517€)
+Distance totale : 1653km
+Véhicules utilisés : 5 Camion Frigo - 1 Poids Lourd
+
+Date : 2024-02-24

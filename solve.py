@@ -1,5 +1,6 @@
-from utils.problem import Problem, read_problem
-from models.cp_solver import solve_vrp, cluster_nodes
+from utils.problem import Problem, Solution
+from models.cp_solver import solve_vrp
+from models.routing_solver import solve
 import argparse
 
 
@@ -16,33 +17,30 @@ if __name__ == "__main__":
 
     if args.improve:
         outfile = args.improve
-        infile = args.improve
+        init_sol = Solution.read_from_json(args.improve)
     else:
         outfile = args.outfile
-        infile = args.infile
+        if args.infile:
+            init_sol = Solution.read_from_json(args.infile)
+        else:
+            init_sol = None
 
-    if not outfile:
-        print("Please specify an output file")
-        exit()
+    centres_file = "data/centres_variations/centres_keep.xlsx"
 
-    centres_file = "data/centres.xlsx"
-
-    problem = read_problem(
+    problem = Problem.from_files(
         centres_file,
         "data/points_de_ramasse.xlsx",
         "data/vehicules.xlsx",
-        "data/euclidean_matrix.xlsx",
-        "data/duration_matrix_w_traffic.xlsx",
+        "data/distance_matrix.xlsx",
+        "data/traffic_duration_matrix.xlsx",
+        "data/no_traffic_duration_matrix.xlsx",
         "data/params.json",
         week=args.week,
     )
 
-    # visits = cluster_nodes(problem)
-
-    tours, obj = solve_vrp(
+    solve_vrp(
         problem,
-        hint=infile,
+        hint=init_sol,
         outfile=outfile,
         violation_cost=None,
-        predefined_visits=None,
     )
