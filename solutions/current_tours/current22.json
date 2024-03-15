@@ -1,9 +1,9 @@
 {
-    "week": 1,
-    "total_costs": 790.04888,
+    "week": 2,
+    "total_costs": 739.25533,
     "fixed_costs": 55.35849,
-    "variable_costs": 734.69039,
-    "total_distance": 2157796,
+    "variable_costs": 683.89684,
+    "total_distance": 1991804,
     "vehicles_used": [true, true, true, true, true, true, true, true, true, false, false, false],
     "tours": {
         "0, 0": [
@@ -82,20 +82,12 @@
                 "delivery": [0, 0, 0],
                 "palettes": [0, 0.0, 0.0],
                 "norvegiennes": 0
-            },
-            {
-                "index": 10,
-                "name": "Fonsorbes",
-                "type": "Livraison",
-                "delivery": [0, 0, 0],
-                "palettes": [0, 0.0, 0.0],
-                "norvegiennes": 0
             }
         ],
         "0, 6": [
             {
-                "index": 12,
-                "name": "L Isle en Dodon",
+                "index": 21,
+                "name": "Rieumes",
                 "type": "Livraison",
                 "delivery": [0, 0, 0],
                 "palettes": [0, 0.0, 0.0],
@@ -216,14 +208,6 @@
                 "delivery": [0, 0, 0],
                 "palettes": [0, 0.0, 0.0],
                 "norvegiennes": 0
-            },
-            {
-                "index": 2,
-                "name": "Bagneres de Luchon",
-                "type": "Livraison",
-                "delivery": [0, 0, 0],
-                "palettes": [0, 0.0, 0.0],
-                "norvegiennes": 0
             }
         ],
         "1, 5": [
@@ -246,17 +230,7 @@
                 "norvegiennes": 0
             }
         ],
-        "1, 7": [
-            {
-                "index": 3,
-                "name": "Bessieres",
-                "type": "Livraison",
-                "delivery": [0, 0, 0],
-                "palettes": [0, 0.0, 0.0],
-                "norvegiennes": 0
-            },
-            { "index": 33, "name": "Leclerc Rouffiac", "type": "Ramasse" }
-        ],
+        "1, 7": [{ "index": 33, "name": "Leclerc Rouffiac", "type": "Ramasse" }],
         "1, 8": [
             {
                 "index": 25,
@@ -304,6 +278,14 @@
             }
         ],
         "3, 2": [
+            {
+                "index": 14,
+                "name": "Levignac",
+                "type": "Livraison",
+                "delivery": [0, 0, 0],
+                "palettes": [0, 0.0, 0.0],
+                "norvegiennes": 0
+            },
             { "index": 30, "name": "Leclerc St Orens", "type": "Ramasse" },
             { "index": 31, "name": "Super U Flourens", "type": "Ramasse" }
         ],
@@ -330,8 +312,8 @@
         ],
         "3, 5": [
             {
-                "index": 11,
-                "name": "Fronton",
+                "index": 7,
+                "name": "Cugnaux",
                 "type": "Livraison",
                 "delivery": [0, 0, 0],
                 "palettes": [0, 0.0, 0.0],
@@ -445,17 +427,17 @@
         "0, 2": 11788,
         "0, 3": 8703,
         "0, 4": 5563,
-        "0, 5": 12643,
-        "0, 6": 10872,
+        "0, 5": 9682,
+        "0, 6": 9067,
         "0, 7": 11900,
         "0, 8": 5003,
         "1, 0": 20800,
         "1, 2": 9166,
         "1, 3": 17640,
-        "1, 4": 20346,
+        "1, 4": 14072,
         "1, 5": 5889,
         "1, 6": 4147,
-        "1, 7": 9826,
+        "1, 7": 5563,
         "1, 8": 11788,
         "2, 0": 6744,
         "2, 2": 6744,
@@ -463,10 +445,10 @@
         "2, 4": 4743,
         "2, 5": 11788,
         "3, 1": 7460,
-        "3, 2": 9947,
+        "3, 2": 16321,
         "3, 3": 7740,
         "3, 4": 4619,
-        "3, 5": 6253,
+        "3, 5": 6938,
         "3, 6": 8917,
         "3, 7": 11072,
         "4, 0": 5003,
@@ -483,17 +465,17 @@
         "0, 2": "3h16min",
         "0, 3": "2h25min",
         "0, 4": "1h33min",
-        "0, 5": "3h31min",
-        "0, 6": "3h1min",
+        "0, 5": "2h41min",
+        "0, 6": "2h31min",
         "0, 7": "3h18min",
         "0, 8": "1h23min",
         "1, 0": "5h26min",
         "1, 2": "2h33min",
         "1, 3": "4h36min",
-        "1, 4": "5h47min",
+        "1, 4": "3h45min",
         "1, 5": "1h38min",
         "1, 6": "1h9min",
-        "1, 7": "2h44min",
+        "1, 7": "1h33min",
         "1, 8": "3h16min",
         "2, 0": "1h52min",
         "2, 2": "1h52min",
@@ -501,10 +483,10 @@
         "2, 4": "1h19min",
         "2, 5": "3h16min",
         "3, 1": "2h4min",
-        "3, 2": "2h46min",
+        "3, 2": "4h14min",
         "3, 3": "2h9min",
         "3, 4": "1h17min",
-        "3, 5": "1h44min",
+        "3, 5": "1h56min",
         "3, 6": "2h29min",
         "3, 7": "3h5min",
         "4, 0": "1h23min",

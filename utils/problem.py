@@ -1,8 +1,8 @@
-from dataclasses import dataclass
+import argparse
+from dataclasses import dataclass, asdict
 import pandas as pd
 from math import ceil
 import json
-import random
 from enum import Enum
 
 
@@ -26,6 +26,23 @@ class Centre:
     delivery_week: DeliveryWeek
     demands: dict[ProductType, int]
 
+    def to_dict(self):
+        d = asdict(self)
+        d["allowed_days"] = list(self.allowed_days)
+        d["demands"] = {t.name: self.demands[t] for t in ProductType}
+        d["delivery_week"] = self.delivery_week.name
+        return d
+
+    @classmethod
+    def from_dict(cls, d):
+        return cls(
+            d["index"],
+            d["name"],
+            set(d["allowed_days"]),
+            DeliveryWeek[d["delivery_week"]],
+            {ProductType[k]: v for k, v in d["demands"].items()},
+        )
+
     def __str__(self) -> str:
         return f"Centre {self.index} {self.name} [allowed_days={self.allowed_days} delivery_week={self.delivery_week.name} demands={[str(self.demands[t])+t.name for t in ProductType]}"
 
@@ -41,6 +58,22 @@ class PDR:
     weight: int
     product_type: ProductType
 
+    def to_dict(self):
+        d = asdict(self)
+        d["required_days"] = list(self.required_days)
+        d["product_type"] = self.product_type.name
+        return d
+
+    @classmethod
+    def from_dict(cls, d):
+        return cls(
+            d["index"],
+            d["name"],
+            set(d["required_days"]),
+            d["weight"],
+            ProductType[d["product_type"]],
+        )
+
 
 @dataclass
 class Vehicle:
@@ -55,6 +88,26 @@ class Vehicle:
     cost_per_km: float
     fixed_cost: float
 
+    def to_dict(self):
+        d = asdict(self)
+        d["can_carry"] = [p.name for p in self.can_carry]
+        return d
+
+    @classmethod
+    def from_dict(cls, d):
+        return cls(
+            d["index"],
+            d["name"],
+            d["allowed"],
+            d["capacity"],
+            d["consumption"],
+            d["size"],
+            set([ProductType[p] for p in d["can_carry"]]),
+            d["allows_isotherm_cover"],
+            d["cost_per_km"],
+            d["fixed_cost"],
+        )
+
 
 @dataclass
 class Params:
@@ -65,10 +118,29 @@ class Params:
     norvegienne_capacity: int
     max_stops: int
     max_tour_duration: int
-    max_first_pickup_time: int
     wait_at_centres: int
     wait_at_pdrs: int
     fuel_cost: float
+
+    def to_dict(self):
+        d = asdict(self)
+        d["week"] = self.week.name
+        return d
+
+    @classmethod
+    def from_dict(cls, d):
+        return cls(
+            DeliveryWeek[d["week"]],
+            d["max_palette_capacity"],
+            d["demi_palette_capacity"],
+            d["n_norvegiennes"],
+            d["norvegienne_capacity"],
+            d["max_stops"],
+            d["max_tour_duration"],
+            d["wait_at_centres"],
+            d["wait_at_pdrs"],
+            d["fuel_cost"],
+        )
 
 
 class StopType(Enum):
@@ -86,12 +158,16 @@ class Stop:
     norvegiennes: int = 0
 
     def to_dict(self):
-        dict_self = {"index": self.index, "name": self.name, "type": self.type.name}
+        d = {
+            "index": self.index,
+            "name": self.name,
+            "type": self.type.name,
+        }
         if self.type == StopType.Livraison:
-            dict_self["delivery"] = self.delivery
-            dict_self["palettes"] = self.palettes
-            dict_self["norvegiennes"] = self.norvegiennes
-        return dict_self
+            d["delivery"] = self.delivery
+            d["palettes"] = self.palettes
+            d["norvegiennes"] = self.norvegiennes
+        return d
 
     @classmethod
     def from_dict(cls, dict):
@@ -150,10 +226,11 @@ class Solution:
     def read_from_json(cls, file_path):
         data = json.load(open(file_path))
 
-        key_to_ints = lambda key_str: (
-            int(key_str.split(", ")[0]),
-            int(key_str.split(", ")[1]),
-        )
+        def key_to_ints(key_str):
+            return (
+                int(key_str.split(", ")[0]),
+                int(key_str.split(", ")[1]),
+            )
 
         tour_durations = {key_to_ints(k): v for k, v in data["tour_durations"].items()}
         if "tour_durations_adjusted" in data:
@@ -187,7 +264,6 @@ class Solution:
         no_traffic_matrix: pd.DataFrame,
         params: Params,
     ):
-
         if self.tour_durations_adjusted is not None:
             return
 
@@ -227,6 +303,40 @@ class Problem:
     pdrs: list[PDR]
     params: Params
 
+    def write_as_json(self, path):
+        """Writes the problem to a json file"""
+        dict = {
+            "distance_matrix": self.distance_matrix.values.tolist(),
+            "duration_matrix": self.duration_matrix.values.tolist(),
+            "no_traffic_duration_matrix": self.no_traffic_duration_matrix.values.tolist(),
+            "n_centres": self.n_centres,
+            "n_pdr": self.n_pdr,
+            "m": self.m,
+            "n_days": self.n_days,
+            "vehicles": [v.to_dict() for v in self.vehicles],
+            "centres": [c.to_dict() for c in self.centres],
+            "pdrs": [p.to_dict() for p in self.pdrs],
+            "params": self.params.to_dict(),
+        }
+        json.dump(dict, open(path, "w"))
+
+    @classmethod
+    def from_json(cls, path):
+        dict = json.load(open(path))
+        return cls(
+            pd.DataFrame(dict["distance_matrix"]),
+            pd.DataFrame(dict["duration_matrix"]),
+            pd.DataFrame(dict["no_traffic_duration_matrix"]),
+            dict["n_centres"],
+            dict["n_pdr"],
+            dict["m"],
+            dict["n_days"],
+            [Vehicle.from_dict(v) for v in dict["vehicles"]],
+            [Centre.from_dict(c) for c in dict["centres"]],
+            [PDR.from_dict(p) for p in dict["pdrs"]],
+            Params.from_dict(dict["params"]),
+        )
+
     @classmethod
     def from_files(
         cls,
@@ -265,16 +375,12 @@ class Problem:
         frais_ct = (
             vehicles_df["Frais Contrôle Technique (€/an)"].astype(float).to_list()
         )
-        frais_assurance = (
-            vehicles_df["Frais Assurance (€/mois)"].astype(float).to_list()
-        )
+        frais_assurance = vehicles_df["Frais Assurance (€/an)"].astype(float).to_list()
         costs_per_km = [
             params_json["fuel_cost"] * consumptions[v] / 100 + frais_entretien[v]
             for v in range(m)
         ]
-        fixed_costs = [
-            frais_ct[v] / 53 + frais_assurance[v] * 12 / 53 for v in range(m)
-        ]
+        fixed_costs = [frais_ct[v] / 52 + frais_assurance[v] / 52 for v in range(m)]
 
         vehicles = [
             Vehicle(
@@ -373,7 +479,7 @@ class Problem:
             weights[p] = ceil(weights[p])
 
         # Mandatory pickup days
-        jours_de_ramasse = points_de_ramasse_df[f"Jours de Ramasse"].tolist()
+        jours_de_ramasse = points_de_ramasse_df["Jours de Ramasse"].tolist()
         j_de_ramasse = []
         for pdr in range(n_pdr):
             jours = jours_de_ramasse[pdr].split(", ")
@@ -401,7 +507,6 @@ class Problem:
             params_json["norvegienne_capacity"],
             params_json["max_stops"],
             params_json["max_tour_duration"],
-            params_json["max_first_pickup_time"],
             params_json["wait_at_centres"],
             params_json["wait_at_pdrs"],
             params_json["fuel_cost"],
@@ -422,3 +527,48 @@ class Problem:
         )
 
         return problem
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "centres_file",
+    )
+    parser.add_argument(
+        "points_de_ramasse_file",
+    )
+    parser.add_argument(
+        "vehicles_file",
+    )
+    parser.add_argument(
+        "distance_matrix_file",
+    )
+    parser.add_argument(
+        "duration_matrix_file",
+    )
+    parser.add_argument(
+        "no_traffic_duration_matrix_file",
+    )
+    parser.add_argument(
+        "params_file",
+    )
+    parser.add_argument(
+        "week",
+    )
+
+    parser.add_argument("outfile")
+
+    args = parser.parse_args()
+
+    problem = Problem.from_files(
+        args.centres_file,
+        args.points_de_ramasse_file,
+        args.vehicles_file,
+        args.distance_matrix_file,
+        args.duration_matrix_file,
+        args.no_traffic_duration_matrix_file,
+        args.params_file,
+        int(args.week),
+    )
+
+    problem.write_as_json(args.outfile)

@@ -1,42 +1,22 @@
-import json
-import sys
-from .problem import Problem, Solution, ProductType, DeliveryWeek, Stop, StopType
-import pandas as pd
+import argparse
+from utils.problem import Problem, Solution, ProductType, DeliveryWeek, StopType
+from models.cp_solver import solve_vrp
 from numpy import int64
+import pytest
+from os import remove
+import subprocess
 
 
 def check_solution_file(
-    centres_file,
-    points_de_ramasse_file,
-    vehicles_file,
-    dist_matrix_file,
-    duration_matrix_file,
-    no_traffic_duration_matrix_file,
-    params_file,
-    solution_file_path,
+    problem_file,
+    solution_file,
+    warning_duration_threshold=200,  # Show a warning if estimated duration for a tour is higher than this
 ):
-    """Checks whether a solution file satisfies all constraints"""
-    sol = Solution.read_from_json(solution_file_path)
+    """Checks whether a solution file satisfies all constraints specified in a problem file"""
+    sol = Solution.read_from_json(solution_file)
+    pb = Problem.from_json(problem_file)
 
-    pb = Problem.from_files(
-        centres_file,
-        points_de_ramasse_file,
-        vehicles_file,
-        dist_matrix_file,
-        duration_matrix_file,
-        no_traffic_duration_matrix_file,
-        params_file,
-        sol.week,
-    )
-
-    no_traffic_duration_matrix = pd.read_excel(
-        "data/duration_matrix.xlsx", index_col=0
-    ).astype(int)
-
-    warning_duration_threshold = (
-        200  # Show a warning if estimated duration for a tour is higher than this
-    )
-
+    # Check the durations
     actual_dist = 0
     for (d, v), tour in sol.tours.items():
         tour_indices = [stop.index for stop in tour]
@@ -51,7 +31,7 @@ def check_solution_file(
             if estimated_duration <= 90:
                 estimated_duration += pb.duration_matrix.iloc[a, b] / 60  # type: ignore
             else:
-                estimated_duration += no_traffic_duration_matrix.iloc[a, b] / 60  # type: ignore
+                estimated_duration += pb.no_traffic_duration_matrix.iloc[a, b] / 60  # type: ignore
 
         estimated_duration += sum(
             pb.params.wait_at_centres * (stop.type == StopType.Livraison)
@@ -61,29 +41,9 @@ def check_solution_file(
 
         if estimated_duration > warning_duration_threshold:
             print(
-                f"Warning : tour {d, v} is ~{estimated_duration//60:.0f}h{estimated_duration%60:.0f}min long :",
+                f"[TEST] Warning : tour {d, v} is ~{estimated_duration//60:.0f}h{estimated_duration%60:.0f}min long :",
                 [stop.name for stop in tour],
             )
-
-        # first_pickup_estimated_duration = (
-        #     sum(
-        #         pb.duration_matrix.iloc[a, b]
-        #         for a, b in zip(tours_flat[d, v][:-2], tours_flat[d, v][1:-1])
-        #         if a == 0 or a < pb.n_centres
-        #                             )
-        #     / 60
-        #     + sum(
-        #         pb.params.wait_at_centres for c in tours_flat[d, v][1:-1] if c < pb.n_centres
-        #                             )
-        #     if any(node >= pb.n for node in tours_flat[d, v])
-        #     else 0
-        # )
-
-        # if first_pickup_estimated_duration > pb.max_first_pickup_time:
-        #     print(
-        #         f"Warning : first pickup of tour {key} is at ~{first_pickup_estimated_duration//60:.0f}h{first_pickup_estimated_duration%60:.0f}min :",
-        #         [pb.duration_matrix.index[c] for c in tours_flat[d, v][1:-1]],
-        #     )
 
     # Check that the objective values are correct
     assert actual_dist == int(sol.total_distance)
@@ -91,7 +51,6 @@ def check_solution_file(
     for (d, v), tour in sol.tours.items():
         for stop in tour:
             if stop.type == StopType.Livraison:
-
                 # Product type requirements
                 assert all(
                     ProductType(t) in pb.vehicles[v].can_carry
@@ -246,35 +205,55 @@ def check_solution_file(
             for t in ProductType:
                 assert sum(d[t.value] for d in deliv) >= pb.centres[c].demands[t]
 
-    print("No constraint violations detected - the solution is valid.")
+    print("[TEST] No constraint violations detected - the solution is valid.")
 
 
-def test_file():
-    file = "solutions/test.json"
+test_instances = [
+    "problems/centres_keep_1.json",
+    "problems/centres_keep_2.json",
+    "problems/centres_1.json",
+    "problems/centres_2.json",
+    "problems/centres_adjust_1.json",
+    "problems/centres_adjust_2.json",
+    "problems/centres_adjust_or_keep_1.json",
+    "problems/centres_adjust_or_keep_2.json",
+    "problems/centres_any_1.json",
+    "problems/centres_any_2.json",
+]
 
-    check_solution_file(
-        "data/centres_variations/centres_keep.xlsx",
-        "data/points_de_ramasse.xlsx",
-        "data/vehicules.xlsx",
-        "data/distance_matrix.xlsx",
-        "data/traffic_duration_matrix.xlsx",
-        "data/no_traffic_duration_matrix.xlsx",
-        "data/params.json",
-        file,
+
+@pytest.mark.parametrize("instance", test_instances)
+def test_ortools(instance):
+    tmp_file = "solutions/tmp.json"
+    time_limit = 10
+    problem = Problem.from_json(instance)
+    solve_vrp(problem, outfile=tmp_file, time_limit=time_limit)
+    check_solution_file(instance, tmp_file)
+    remove(tmp_file)
+
+
+@pytest.mark.parametrize("instance", test_instances)
+def test_hexaly(instance):
+    tmp_file = "solutions/tmp.json"
+    time_limit = 10
+    subprocess.run(
+        [
+            "localsolver",
+            "models/ls_solver.lsp",
+            instance,
+            "nil",
+            tmp_file,
+            str(time_limit),
+        ]
     )
+    check_solution_file(instance, tmp_file)
+    remove(tmp_file)
 
 
 if __name__ == "__main__":
-    file = sys.argv[1]
-    week = int(sys.argv[2])
+    parser = argparse.ArgumentParser()
+    parser.add_argument("instance")
+    parser.add_argument("solution")
 
-    check_solution_file(
-        "data/centres_keep.xlsx",
-        "data/points_de_ramasse.xlsx",
-        "data/vehicules.xlsx",
-        "data/distance_matrix.xlsx",
-        "data/traffic_duration_matrix.xlsx",
-        "data/no_traffic_duration_matrix.xlsx",
-        "data/params.json",
-        file,
-    )
+    args = parser.parse_args()
+    check_solution_file(args.instance, args.solution)

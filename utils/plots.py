@@ -1,5 +1,5 @@
 import pandas as pd
-from problem import Problem, Solution, Stop, StopType
+from problem import Solution, Stop, StopType
 import folium
 import argparse
 from dash import Dash, html
@@ -7,8 +7,7 @@ import dash_bootstrap_components as dbc
 from datetime import date
 
 
-def make_dashboard(sol: Solution, output_file_path):
-
+def make_dashboard(sol: Solution):
     vehicles = pd.read_excel("data/vehicules.xlsx", index_col=0)
     vehicle_names = vehicles.index
 
@@ -34,7 +33,7 @@ def make_dashboard(sol: Solution, output_file_path):
                                         html.Tr(
                                             [
                                                 html.Td(
-                                                    f"Palettes",
+                                                    "Palettes",
                                                     style={
                                                         "width": "31%",
                                                         "padding": "0 0px 0 5px",
@@ -49,7 +48,7 @@ def make_dashboard(sol: Solution, output_file_path):
                                         html.Tr(
                                             [
                                                 html.Td(
-                                                    f"Quantités",
+                                                    "Quantités",
                                                     style={
                                                         "width": "31%",
                                                         "padding": "0 0px 0 5px",
@@ -163,7 +162,7 @@ def make_dashboard(sol: Solution, output_file_path):
     infos = dbc.Card(
         [
             html.H4(f"Date : {date.today()}"),
-            html.H4(f""),
+            html.H4(""),
             html.H4(f"Semaine : {sol.week}"),
             html.H4(
                 f"Coûts totaux : {sol.total_costs:.0f}€     (Fixes {sol.fixed_costs:.0f} | Variables {sol.variable_costs:.0f})"
@@ -247,7 +246,6 @@ def print_to_txt(sol: Solution, output_file_path):
         output += f"\n- - - - {jours_map[d].upper()} - - - -\n\n"
         day_tours = {v: tour for (d2, v), tour in sol.tours.items() if d2 == d}
         for v, tour in day_tours.items():
-
             if sol.tour_durations_adjusted:
                 est_time = sol.tour_durations_adjusted[d, v]
             else:
@@ -418,4 +416,4 @@ if __name__ == "__main__":
         plot_solution(sol, file_name + ".html")
 
     if args.dashboard:
-        make_dashboard(sol, file_name + ".html")
+        make_dashboard(sol)

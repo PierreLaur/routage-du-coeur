@@ -7,32 +7,24 @@ use datetime;
 
 function input() {
 
-    usage = "Usage : localsolver ls_solver.lsp <init_solution or 'nil'> <desired output file path> <week number (1 or 2)>";
-    if (outfile == nil) throw usage;
-    if (week == nil) throw usage;
+    problem = json.parse(problem_file) ;
 
-    params = json.parse("data/params.json") ;
-    
-    centres = csv.parse("data/centres_keep.csv");
-    pdr = csv.parse("data/points_de_ramasse.csv");
-    matrix = csv.parse("data/euclidean_matrix.csv");
-    matrix2 = csv.parse("data/duration_matrix_w_traffic.csv");
-    vehicles = csv.parse("data/vehicules.csv");
+    params = problem["params"] ;
 
-    n_centres = centres.nbRows ;
+    centres = problem["centres"];
+    pdrs = problem["pdrs"];
+    matrix = problem["distance_matrix"];
+    matrix2 = problem["duration_matrix"];
+    vehicles = problem["vehicles"];
+
+    n_centres = problem["n_centres"];
 
     delivered_centres = {} ;
     delivered_centres_and_pdrs = {} ;
     semihebdo_index = 0 ;
     for [c in 1...n_centres] {
-        semaine_livraison = centres.rows[c][7] ;
-
-        if (semaine_livraison != 0) {
-            semaine_livraison = params["week_assignments"][semihebdo_index] ;
-            semihebdo_index += 1 ;
-        }
-
-        if(semaine_livraison == 0 || semaine_livraison == week) {
+        semaine_livraison = centres[c]["delivery_week"] ;
+        if(semaine_livraison == "ANY" || semaine_livraison == params["week"]) {
             delivered_centres.add(c) ;
             delivered_centres_and_pdrs.add(c) ;
         }
@@ -41,8 +33,8 @@ function input() {
     // The number of centres to deliver this week, not including the depot
     n = delivered_centres.count();
 
-    m = vehicles.nbRows;
-    n_pdr = pdr.nbRows;
+    m = vehicles.count();
+    n_pdr = pdrs.count();
     n_cp = n + n_pdr;
     n_days = 5 ;
 
@@ -50,36 +42,23 @@ function input() {
         delivered_centres_and_pdrs.add(p) ;
     }
 
+    product_types = {"A", "F", "S"};
+
     // Demands
     for [i in delivered_centres] {
-        demands["A"][i] = ceil(centres.rows[i][4] * params["robustness_factor"]) ;
+        demands["A"][i] = centres[i]["demands"]["A"] ;
         pallet_demands[i]["A"] = ceil(demands["A"][i] / params["max_palette_capacity"]) ;
 
-        demands["F"][i] = ceil(centres.rows[i][5] * params["robustness_factor"]) ;
+        demands["F"][i] = centres[i]["demands"]["A"] ;
         pallet_demands[i]["F"] = ceil(demands["F"][i] / params["demi_palette_capacity"]) ;
         
-        demands["S"][i] = ceil(centres.rows[i][6] * params["robustness_factor"]) ;
+        demands["S"][i] = centres[i]["demands"]["A"] ;
         pallet_demands[i]["S"] = ceil(demands["S"][i] / params["demi_palette_capacity"]) ;
-    }
-
-    // Pickup weights (per pickup)
-    for [p in n_centres...n_centres + n_pdr] {
-        weight[p] = ceil(pdr.rows[p - n_centres][5]);
     }
 
     realindex = {} ;
     dupnodes = {} ;
     nodetype = {} ;
-
-    jours_map = {"Lundi": 0, "Mardi": 1, "Mercredi": 2, "Jeudi": 3, "Vendredi": 4};
-    // When do we have to pickup each site ?
-    for [i in 0...n_pdr] {
-        jours = pdr.rows[i][4].split(", ") ;
-        j_de_ramasse[i] = {};
-        for [k in 0...jours.count()] {
-            j_de_ramasse[i].add(jours_map[jours[k]]);
-        }
-    }
 
     // Duplicate the nodes for each palette and store a map
     i = 0 ;
@@ -96,10 +75,10 @@ function input() {
                 }
             }
         } else {
-            for [j in j_de_ramasse[cp - n_centres]] {
+            for [j in pdrs[cp - n_centres]["required_days"]] {
                 dupnodes[cp].add(i) ;
                 realindex[i] = cp ;
-                nodetype[i] = pdr.rows[cp - n_centres][6] ;
+                nodetype[i] = pdrs[cp - n_centres]["product_type"] ;
                 i += 1 ;
             }
         }
@@ -117,45 +96,43 @@ function input() {
     for [cp in delivered_centres_and_pdrs] {
 
         for [node in dupnodes[cp]] {
-            dist_from_depot[node] = matrix.rows[0][cp+1] ;
-            dist_to_depot[node] = matrix.rows[cp][1] ;
-            time_from_depot[node] = matrix2.rows[0][cp+1] ;
-            time_to_depot[node] = matrix2.rows[cp][1] ;
+
+            dist_from_depot[node] = matrix[0][cp] ;
+            time_from_depot[node] = matrix2[0][cp] ;
+            dist_to_depot[node] = matrix[cp][0] ;
+            time_to_depot[node] = matrix2[cp][0] ;
 
             for [node2 in 0...n_nodes] {
-                dist_matrix[node][node2] = matrix.rows[cp][realindex[node2]+1];
-                time_matrix[node][node2] = matrix2.rows[cp][realindex[node2]+1];
+                dist_matrix[node][node2] = matrix[cp][realindex[node2]];
+                time_matrix[node][node2] = matrix2[cp][realindex[node2]];
             }
         }
     }
 
-    for [i in 0...m] {
-        row = vehicles.rows[i];
-        // Capacities in kg
-        capacities[i] = row[1];
-        
-        // Sizes in number of pallets
-        sizes[i] = row[2];
+    allowed_vehicles = {};
+    for [v in 0...m] {
 
-        // Fuel consumption (L/100km)
-        fuel[i] = row[3];
+        if (vehicles[v]["allowed"]) {
+            allowed_vehicles.add(v);
+        }
 
-        // Whether the vehicle can transport products that need to be refrigerated
-        frais[i] = row[4];
-    }
-
-    // When are we allowed to deliver each centre ?
-    for [c in delivered_centres] {
-        jours = centres.rows[c][10].replace(" ", "").split(",") ;
-        j_de_livraison[c] = {};
-        for [k in 0...jours.count()] {
-            j_de_livraison[c].add(jours_map[jours[k]]);
+        // Whether the vehicle can transport each type of product
+        for [t in product_types] {
+            can_carry[v][t] = false;
+            for [t2 in vehicles[v]["can_carry"]] {
+                if (t == t2) {
+                    can_carry[v][t] = true ;
+                    break;
+                }
+            }
         }
     }
+
+    // Can we deliver c on day d ?
     for [c in delivered_centres] {
         for [d in 0...n_days] {
             delivery_allowed[d][c] = false ;
-            for [a in j_de_livraison[c]] {
+            for [a in centres[c]["allowed_days"]] {
                 if (a==d) {
                     delivery_allowed[d][c] = true ;
                     break ;
@@ -164,18 +141,13 @@ function input() {
         }
     }
 
+    // Do we have to pickup p on day d ?
     for [p in 0...n_pdr] {
-        i = 0 ;
         for [d in 0...n_days] {
-            for [node in dupnodes[p + n_centres]] {
-                pickup_d_p[d][node] = false ;
-            }
-
-            // Do we have to pickup p on day d ?
-            for [j in j_de_ramasse[p]] {
+            pickup_d_p[d][p] = false ;
+            for [j in pdrs[p]["required_days"]] {
                 if (j==d) {
-                    pickup_d_p[d][dupnodes[p + n_centres][i]] = true ;
-                    i += 1 ;
+                    pickup_d_p[d][p] = true ;
                     break ;
                 }
             }
@@ -218,7 +190,7 @@ function add_specific_requirements() {
         constraint visits_l[1][2][node] ;
         constraint n_stops_l[1][2] == 1 ; 
         constraint n_stops_r[1][2] == 0 ;
-        constraint and[d in 0...n_days][v in 0...m : params["vehicle_allowed"][v] && (d!=1 || v!=2)]
+        constraint and[d in 0...n_days][v in allowed_vehicles : (d!=1 || v!=2)]
                     (!visits_l[d][v][node]) ;
     }
 
@@ -233,15 +205,15 @@ function add_specific_requirements() {
 
 function model() {
 
-    livraisons[d in 0...n_days][v in 0...m : params["vehicle_allowed"][v]] <- list(n_centre_nodes) ;
-    ramasses[d in 0...n_days][v in 0...m : params["vehicle_allowed"][v]] <- list(n_pdr_nodes);
+    livraisons[d in 0...n_days][v in allowed_vehicles] <- list(n_centre_nodes) ;
+    ramasses[d in 0...n_days][v in allowed_vehicles] <- list(n_pdr_nodes);
 
     // Every node has to be delivered/picked up exactly once
-    constraint partition[d in 0...n_days][v in 0...m : params["vehicle_allowed"][v]](livraisons[d][v]);
-    constraint partition[d in 0...n_days][v in 0...m : params["vehicle_allowed"][v]](ramasses[d][v]);
+    constraint partition[d in 0...n_days][v in allowed_vehicles](livraisons[d][v]);
+    constraint partition[d in 0...n_days][v in allowed_vehicles](ramasses[d][v]);
 
     for [d in 0...n_days] {
-        for [v in 0...m : params["vehicle_allowed"][v]] {
+        for [v in allowed_vehicles] {
             n_livraisons[d][v] <- count(livraisons[d][v]) ;
             n_ramasses[d][v] <- count(ramasses[d][v]) ;
 
@@ -251,11 +223,12 @@ function model() {
             visits_l[d][v][c in 0...n_centre_nodes] <- contains(livraisons[d][v], c) ;
             visits_r[d][v][p in 0...n_pdr_nodes] <- contains(ramasses[d][v], p);
 
-            if (frais[v] != "Oui") {
-                for [c in 0...n_centre_nodes : nodetype[c] != "A"] {
+            for [t in product_types] {
+                if (can_carry[v][t]) continue ;
+                for [c in 0...n_centre_nodes : nodetype[c] == t] {
                     constraint !visits_l[d][v][c] ;
                 }
-                for [p in 0...n_pdr_nodes : nodetype[p + n_centre_nodes] == "F"] {
+                for [p in 0...n_pdr_nodes : nodetype[p + n_centre_nodes] == t] {
                     constraint !visits_r[d][v][p] ;
                 }
             }
@@ -264,7 +237,7 @@ function model() {
                 constraint !visits_l[d][v][c] ;
             }
 
-            for [p in 0...n_pdr_nodes : !pickup_d_p[d][p+n_centre_nodes]] {
+            for [p in 0...n_pdr_nodes : !pickup_d_p[d][realindex[p + n_centre_nodes] - n_centres]] {
                 constraint !visits_r[d][v][p] ;
             }
 
@@ -288,15 +261,15 @@ function model() {
 
 
             // Delivery capacity constraints
-            constraint sum[c in 0...n_centre_nodes](visits_l[d][v][c] * quantity[d][v][c]) <= capacities[v] ;
+            constraint sum[c in 0...n_centre_nodes](visits_l[d][v][c] * quantity[d][v][c]) <= vehicles[v]["capacity"] ;
             constraint sum[c in 0...n_centre_nodes](
                     2 * visits_l[d][v][c] * (nodetype[c] == "A") + 
                     visits_l[d][v][c] * (nodetype[c] == "F") + 
-                    demi_palettes_s[d][v][c] * (nodetype[c] == "S")) <= 2 * sizes[v] ;
+                    demi_palettes_s[d][v][c] * (nodetype[c] == "S")) <= 2 * vehicles[v]["size"] ;
 
             // Pickup capacity constraints
-            constraint sum[p in 0...n_pdr_nodes](weight[realindex[p+n_centre_nodes]] * visits_r[d][v][p]) <= capacities[v];
-            constraint sum[p in 0...n_pdr_nodes](2 * visits_r[d][v][p]) <= sizes[v] ; 
+            constraint sum[p in 0...n_pdr_nodes](pdrs[realindex[p+n_centre_nodes] - n_centres]["weight"] * visits_r[d][v][p]) <= vehicles[v]["capacity"];
+            constraint sum[p in 0...n_pdr_nodes](2 * visits_r[d][v][p]) <= vehicles[v]["size"] ; 
 
             // Deliver first, then pickup
             route_dist[d][v] <- (liv[d][v] ? dist_from_depot[livraisons[d][v][0]]
@@ -334,13 +307,11 @@ function model() {
                     ;
 
             constraint tour_duration[d][v] <= params["max_tour_duration"] * 60 ;
-
-
             constraint n_stops_l[d][v] + n_stops_r[d][v] <= params["max_stops"] ;
         }
 
         // constraint sum[c in 0...n : delivery_allowed[d][c]]
-        //             [v in 0...m : params["vehicle_allowed"][v]]
+        //             [v in allowed_vehicles]
         //             (norvegiennes[d][v][c]) <= params["n_norvegiennes"] ;
     }
 
@@ -348,21 +319,26 @@ function model() {
 
     // Meet demands for each product type
     for [c in delivered_centres] {
-        for [type in {"A", "F", "S"}] {
+        for [type in product_types] {
             constraint sum[d in 0...n_days : delivery_allowed[d][c]]
-                            [v in 0...m : params["vehicle_allowed"][v]]
+                            [v in allowed_vehicles]
                             [node in dupnodes[c] : nodetype[node]==type]
                             (visits_l[d][v][node] * quantity[d][v][node]) >= demands[type][c];
         }
     }
 
-    fuel_consumption <- sum[d in 0...n_days][v in 0...m : params["vehicle_allowed"][v]](route_dist[d][v] * fuel[v] / 100000);
-    used[v in 0...m : params["vehicle_allowed"][v]] <- or[d in 0...n_days](liv[d][v] || ram[d][v]) ;
+    used[v in allowed_vehicles] <- or[d in 0...n_days](liv[d][v] || ram[d][v]) ;
+    fixed_costs <- sum[v in allowed_vehicles](vehicles[v]["fixed_cost"] * used[v]);
+    n_used <- sum[v in allowed_vehicles](used[v]) ;
 
-    n_used <- sum[v in 0...m : params["vehicle_allowed"][v]](used[v]) ;
-    total_cost <- fuel_consumption * params["fuel_cost"] + 15 * n_used ;
+    variable_costs <- sum[d in 0...n_days][v in allowed_vehicles](vehicles[v]["cost_per_km"] * route_dist[d][v] / 1000);
 
-    minimize total_cost ;
+    total_costs <- variable_costs + fixed_costs ;
+    total_distance <- sum[v in allowed_vehicles][d in 0...n_days](route_dist[d][v]);
+
+    // constraint total_costs <= 455 ;
+
+    minimize total_costs ;
 
 }
 
@@ -371,7 +347,7 @@ function write_solution() {
     local outf = io.openWrite(outfile);
 
     sol = {};
-    sol["total_distance"] = sum[d in 0...n_days][v in 0...m : params["vehicle_allowed"][v]](route_dist[d][v].value);
+    sol["total_distance"] = sum[d in 0...n_days][v in allowed_vehicles](route_dist[d][v].value);
     sol["fuel_consumption"] = fuel_consumption.value;
     sol["total_cost"] = total_cost.value;
     sol["vehicles_used"] = {} ;
@@ -387,7 +363,7 @@ function write_solution() {
     sol["tours"] = {};
 
     for [d in 0...n_days] {
-        for [v in 0...m : params["vehicle_allowed"][v]] {
+        for [v in allowed_vehicles] {
             if (livraisons[d][v].value.count() == 0 && ramasses[d][v].value.count() == 0) continue;
 
             key = d + ", " + v ;
@@ -492,29 +468,25 @@ function callback(ls, cbType) {
 
 function main(args) {
 
-    initfile=args[0] == "nil" ? nil : args[0];
-    outfile=args[1];
-    week=args[2].toInt();
+    usage = "Usage: ls_solver_split problem_file";
+    if (args.count() < 1) {
+        throw usage;
+    }
+
+    problem_file = args[0];
+
+    input();
 
     lastBestValue = inf - 1 ;
     lastBestRunningTime = 0;
     lastSolutionWritten = false;
 
-    input();
-
     with(ls = localsolver.create()) {
-        ls.addCallback("ITERATION_TICKED", callback);
-        ls.param.verbosity = 0 ;
+        ls.param.verbosity = 2 ;
 
         model();
 
-        ls.param.setAdvancedParam("clarkeAndWrightEnabled", false);
-        // ls.param.timeLimit = 10;
         ls.model.close();
-
-        if (initfile != nil) {
-            set_initial_solution(false, nil);
-        }
 
         ls.solve();
     }

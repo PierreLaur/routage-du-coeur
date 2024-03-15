@@ -1,11 +1,10 @@
 from ortools.sat.python import cp_model
 from math import inf, ceil
-import json
 from utils.problem import Problem, Solution, DeliveryWeek, ProductType, Stop, StopType
 
 
 class LogPrinter(cp_model.CpSolverSolutionCallback):
-    """Print the current objective value and the optimality gap as the search progresses"""
+    """Print the current objective values and the optimality gap as the search progresses"""
 
     def __init__(self, fixed_costs, variable_costs, total_distance, used):
         cp_model.CpSolverSolutionCallback.__init__(self)
@@ -41,7 +40,6 @@ def add_domsym_breaking(
 ):
     # Dominance breaking
     for d, v, c in visits:
-
         if c == 0 or c >= pb.n_centres:
             continue
 
@@ -71,23 +69,11 @@ def add_hint(
 ) -> None:
     """
     Adds an initial solution as a hint to the model.
-
-    Args:
-        model (cp_model.CpModel): The constraint programming model.
-        problem (Problem): The problem instance.
-        arcs: The arcs in the problem instance.
-        visits: The visits in the problem instance.
-        delivers: The delivers in the problem instance.
-        palettes: The palettes in the problem instance.
-        demi_palettes: The demi_palettes in the problem instance.
-        norvegiennes: The norvegiennes in the problem instance.
-        init_sol: The file containing the hint data.
     """
 
     # Iterate over each day and vehicle
     for day in range(problem.n_days):
         for vehicle in range(problem.m):
-
             # Ignore unused vehicles
             if not problem.vehicles[vehicle].allowed:
                 continue
@@ -236,7 +222,6 @@ def post_process(
     Also adds the time required to come back to the depot to the tour duration"""
 
     for (d, v), tour in tours.items():
-
         # Remove any useless norvegiennes and demi palettes for s products
         for c in tour:
             if (d, v, c, ProductType.S) not in demi_palettes:
@@ -302,7 +287,7 @@ def post_process(
         tour_duration[d, v] += pb.duration_matrix.iloc[tours[d, v][-2], 0]
 
 
-def add_specific_requirements(pb: Problem, model: cp_model.CpModel, visits, arcs):
+def add_specific_requirements(pb: Problem, model: cp_model.CpModel, visits):
     """
     Adds a few "hard-coded" constraints
     These are not written in the input files but have been specified by the client
@@ -342,30 +327,10 @@ def add_specific_requirements(pb: Problem, model: cp_model.CpModel, visits, arcs
         for v in range(pb.m)
         if (d, v, carrefour_centrale_a_index) in visits and (d, v) != (2, 0)
     )
-    # for vd in [0 + 2 * pb.m, 2 + 2 * pb.m, 2 + 4 * pb.m]:
-    #     if not arcs:
-    #         break
-    #     model.AddBoolAnd(
-    #         (
-    #             arcs[vd, p1, p2][2].Not()
-    #             if p1 != p2 or p1 == carrefour_centrale_index
-    #             else arcs[vd, p1, p2][2]
-    #         )
-    #         for p1 in range(pb.n_centres, pb.n_centres + pb.n_pdr)
-    #         for p2 in range(pb.n_centres, pb.n_centres + pb.n_pdr)
-    #     )
-    #     model.Add(arcs[vd, carrefour_centrale_index, 0][2] == 1)
 
     # The PL cannot deliver Toulouse/Grande-Bretagne
     index_gde_bretagne = 24
     model.AddBoolAnd(visits[d, 0, index_gde_bretagne].Not() for d in range(pb.n_days))
-    # model.AddBoolAnd(
-    #     arcs[0 + d * pb.m, p1, p2][2].Not()
-    #     for d in range(pb.n_days)
-    #     for p1 in range(pb.n_centres, pb.n_centres + pb.n_pdr)
-    #     for p2 in range(pb.n_centres, pb.n_centres + pb.n_pdr)
-    #     if p1 == index_gde_bretagne or p2 == index_gde_bretagne
-    # )
 
     # A camion frigo must deliver Revel on Tuesdays and do nothing else
     index_revel = 20
@@ -374,16 +339,7 @@ def add_specific_requirements(pb: Problem, model: cp_model.CpModel, visits, arcs
         for node in range(1, pb.n_centres + pb.n_pdr)
         if (1, 2, node) in visits
     )
-    # vd = 2 + 1 * pb.m
-    # model.AddBoolAnd(
-    #     (
-    #         arcs[vd, a, b][2]
-    #         if (a, b) in [(0, index_revel), (index_revel, 0)]
-    #         else arcs[vd, a, b][2].Not()
-    #     )
-    #     for (vd2, a, b) in arcs
-    #     if vd2 == vd and a != b
-    # )
+
     model.AddBoolAnd(
         visits[d, v, index_revel].Not()
         for d in range(pb.n_days)
@@ -396,7 +352,6 @@ def add_specific_requirements(pb: Problem, model: cp_model.CpModel, visits, arcs
     index_arenes = 26
     model.Add(visits[4, 3, index_arenes] == 1)
     model.Add(visits[4, 3, index_lc_blagnac] == 1)
-    # model.Add(arcs[3 + 4 * pb.m, index_arenes, index_lc_blagnac][2] == 1)
 
 
 def solve_vrp(
@@ -486,13 +441,12 @@ def solve_vrp(
     for d in range(pb.n_days):
         for v in allowed_vehicles:
             for c in delivered_centres:
-
                 for t in ProductType:
                     delivers[d, v, c, t] = (
                         model.NewIntVar(
                             0,
                             min(pb.vehicles[v].capacity, pb.centres[c].demands[t]),
-                            f"",
+                            "",
                         )
                         if t in pb.vehicles[v].can_carry
                         else model.NewConstant(0)
@@ -559,7 +513,7 @@ def solve_vrp(
     ########## Time  windows ###########
     violations = (
         {c: model.NewBoolVar("") for c in delivered_centres} if violation_cost else {}
-    )
+    )  # violations on allowed delivery days can optionally be made soft
 
     for d in range(pb.n_days):
         for pdr in range(pb.n_pdr):
@@ -578,7 +532,7 @@ def solve_vrp(
                     if pb.pdrs[pdr].product_type not in pb.vehicles[v].can_carry
                 )
             else:
-                # Do not visit them if not required (this improves pruning)
+                # Do not visit them if not required (this seems to improve pruning)
                 model.AddBoolAnd(
                     [visits[d, v, pdr + pb.n_centres].Not() for v in allowed_vehicles]
                 )
@@ -595,7 +549,6 @@ def solve_vrp(
                     model.AddBoolAnd([visits[d, v, c].Not() for v in allowed_vehicles])
 
     for c in delivered_centres:
-
         # Redundant Cover constraint
         min_visits = max(
             ceil(sum(pb.centres[c].demands.values()) / pb.vehicles[2].capacity),
@@ -631,23 +584,6 @@ def solve_vrp(
             max_visits,
         )
 
-    add_specific_requirements(pb, model, visits, arcs)
-    add_domsym_breaking(pb, model, delivers, visits)
-
-    # Add input file as a hint
-    if hint:
-        add_hint(
-            model,
-            pb,
-            arcs,
-            visits,
-            delivers,
-            palettes,
-            demi_palettes,
-            norvegiennes,
-            hint,
-        )
-
     # Every customer must be served his demand
     for c in delivered_centres:
         for type in ProductType:
@@ -662,7 +598,6 @@ def solve_vrp(
 
     # Capacity constraints
     for d in range(pb.n_days):
-
         model.Add(
             sum(
                 norvegiennes[d, v, c]
@@ -737,31 +672,22 @@ def solve_vrp(
                 <= pb.params.max_stops
             )
 
-            # time_to_first_pickup = sum(
-            #     arc[2] * pb.duration_matrix.iloc[arc[0], arc[1]]
-            #     for arc in vd_arcs
-            #     if (arc[0] < pb.n)
-            # ) + pb.params.wait_at_centres * 60 * sum(
-            #     visits[d, v, c] for c in delivered_centres
-            # )
-            # ram = model.NewBoolVar("")
-            # model.Add(
-            #     time_to_first_pickup <= pb.max_first_pickup_time * 60
-            # ).OnlyEnforceIf(ram)
+    add_specific_requirements(pb, model, visits)
+    add_domsym_breaking(pb, model, delivers, visits)
 
-            # model.AddBoolAnd(
-            #     visits[d, v, p].Not() for p in range(pb.n_centres, pb.n_centres + pb.n_pdr)
-            # ).OnlyEnforceIf(ram.Not())
-            # model.AddBoolOr(
-            #     visits[d, v, p] for p in range(pb.n_centres, pb.n_centres + pb.n_pdr)
-            # ).OnlyEnforceIf(ram)
-
-    # Used vehicles
-    used = {v: model.NewBoolVar("") for v in allowed_vehicles}
-    for v in allowed_vehicles:
-        model.AddBoolAnd(
-            visits[d, v2, c].Not() for (d, v2, c) in visits if v2 == v
-        ).OnlyEnforceIf(used[v].Not())
+    # Add input file as a hint
+    if hint:
+        add_hint(
+            model,
+            pb,
+            arcs,
+            visits,
+            delivers,
+            palettes,
+            demi_palettes,
+            norvegiennes,
+            hint,
+        )
 
     # Objectives
     total_distance = sum(
@@ -770,6 +696,11 @@ def solve_vrp(
         if arc[0] != arc[1]
     )
 
+    used = {v: model.NewBoolVar("") for v in allowed_vehicles}
+    for v in allowed_vehicles:
+        model.AddBoolAnd(
+            visits[d, v2, c].Not() for (d, v2, c) in visits if v2 == v
+        ).OnlyEnforceIf(used[v].Not())
     variable_costs = (
         sum(
             route_dist[d, v] * pb.vehicles[v].cost_per_km
@@ -787,76 +718,35 @@ def solve_vrp(
     model.Minimize(total_costs)
 
     solver = cp_model.CpSolver()
-    solver.parameters.num_workers = 24
-
-    solver.parameters.use_lns_only = True
+    solver.parameters.num_workers = 16
+    # solver.parameters.use_lns_only = True
     # solver.parameters.diversify_lns_params = True
-    # solver.parameters.min_num_lns_workers = 24
-
-    # solver.parameters.repair_hint = True
-    # solver.parameters.hint_conflict_limit = 9999999
     # solver.parameters.fix_variables_to_their_hinted_value = True
-
-    # solver.parameters.ignore_subsolvers.extend(
-    #     [
-    #         "lb_tree_search",
-    #         "max_lp",
-    #         "pseudo_costs",
-    #         "reduced_costs",
-    #         "objective_lb_search",
-    #         "objective_lb_search_max_lp",
-    #         "objective_lb_search_no_lp",
-    #         "objective_shaving_search_max_lp",
-    #         "objective_shaving_search_no_lp",
-    #         "probing",
-    #         "probing_max_lp",
-    #         "quick_restart",
-    #         "default_lp",
-    #         "core",
-    #     ]
-    # )
-
-    """
-    All solvers : [
-        core,
-        default_lp,
-        max_lp,
-        no_lp,
-        objective_lb_search,
-        objective_lb_search_max_lp,
-        objective_lb_search_no_lp,
-        objective_shaving_search_max_lp,
-        objective_shaving_search_no_lp,
-        probing,
-        probing_max_lp,
-        pseudo_costs,
-        quick_restart,
-        quick_restart_no_lp,
-        reduced_costs,
-    ]
-    """
 
     if time_limit:
         solver.parameters.max_time_in_seconds = time_limit
 
     print("Solving...")
-    solver.parameters.log_search_progress = True
-    status = solver.Solve(model)
-    # status = solver.Solve(
-    #     model, LogPrinter(fixed_costs, variable_costs, total_distance, used)
-    # )
+
+    # solver.parameters.log_search_progress = True
+    # status = solver.Solve(model)
+    status = solver.Solve(
+        model, LogPrinter(fixed_costs, variable_costs, total_distance, used)
+    )
 
     if status not in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
         print("No solution found")
-        return [], 0
+        return
 
     if violation_cost:
         for c in violations:
             if solver.Value(violations[c]):
-                print("Violation on centre ", c)
+                print("Allowed delivery days violation at centre ", c)
 
     if not outfile:
         return
+
+    ##### Process the results and write as a json solution file
 
     tours_flat = read_tours(pb, arcs, solver)
     delivers = {k: solver.Value(v) for k, v in delivers.items()}
@@ -882,7 +772,10 @@ def solve_vrp(
     for (d, v), tour in tours_flat.items():
         t = []
         for node in tour[1:-1]:
-            name = pb.distance_matrix.index[node]
+            if node >= pb.n_centres:
+                name = pb.pdrs[node - pb.n_centres].name
+            else:
+                name = pb.centres[node].name
             stop = Stop(node, name, StopType(node >= pb.n_centres))  # type:ignore
             if node < pb.n_centres:
                 stop.delivery = (
@@ -900,7 +793,7 @@ def solve_vrp(
         tours[d, v] = t
 
     sol = Solution(
-        pb.params.week.value,
+        pb.params.week.name,
         solver.Value(total_costs),  # type: ignore
         solver.Value(fixed_costs),  # type: ignore
         solver.Value(variable_costs),  # type: ignore
