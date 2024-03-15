@@ -209,16 +209,16 @@ def check_solution_file(
 
 
 test_instances = [
-    "problems/centres_keep_1.json",
-    "problems/centres_keep_2.json",
+    "problems/centres_fixe_1.json",
+    "problems/centres_fixe_2.json",
+    "problems/centres_flex_1.json",
+    "problems/centres_flex_2.json",
+    "problems/centres_any_1.json",
+    "problems/centres_any_2.json",
     "problems/centres_1.json",
     "problems/centres_2.json",
     "problems/centres_adjust_1.json",
     "problems/centres_adjust_2.json",
-    "problems/centres_adjust_or_keep_1.json",
-    "problems/centres_adjust_or_keep_2.json",
-    "problems/centres_any_1.json",
-    "problems/centres_any_2.json",
 ]
 
 

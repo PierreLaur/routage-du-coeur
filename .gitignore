@@ -1,8 +1,6 @@
 api_key
+.python-version
 vrp/
 __pycache__/
 .pytest_cache/
 .vscode/
-.python-version
-overnight/
-old/

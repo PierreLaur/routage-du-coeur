@@ -288,7 +288,7 @@ function model() {
     total_costs <- variable_costs + fixed_costs ;
     total_distance <- sum[v in allowed_vehicles][d in 0...n_days](route_dist[d][v]);
 
-    // constraint total_costs <= 455 ;
+    // constraint total_costs <= 430 ;
 
     minimize total_costs ;
 
