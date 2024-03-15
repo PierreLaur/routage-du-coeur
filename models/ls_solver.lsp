@@ -189,6 +189,7 @@ function model() {
             for [c in 0...n : !delivery_allowed[d][c]] {
                 constraint !visits_l[d][v][c] ;
             }
+
             for [p in 0...n_pdr] {
                 if (!pickup_d_p[d][p] || !can_carry[v][pdrs[p]["product_type"]]) {
                     constraint !visits_r[d][v][p] ;
@@ -258,7 +259,8 @@ function model() {
     for [p in 0...n_pdr] {
         for [d in 0...n_days] {
             if (pickup_d_p[d][p]) {
-                constraint xor[v in allowed_vehicles : can_carry[v][pdrs[p]["product_type"]]](visits_r[d][v][p]) ;
+                constraint xor[v in allowed_vehicles](visits_r[d][v][p]) ;
+                // constraint or[v in allowed_vehicles : can_carry[v][pdrs[p]["product_type"]]](visits_r[d][v][p]) ;
             } else {
                 // constraint and[v in allowed_vehicles](visits_r[d][v][p] == 0) ;
             }
@@ -268,12 +270,16 @@ function model() {
     // Redundant
     for [d in 0...n_days] {
         constraint disjoint[v in allowed_vehicles](ramasses[d][v]) ;
+        // for [p in 0...n_pdr : pickup_d_p[d][p]] {
+        //     constraint sum[v in allowed_vehicles : can_carry[v][pdrs[p]["product_type"]]](visits_r[d][v][p]) == 1 ;
+        // }
     }
 
     // Meet demands for each product type
     for [c in 0...n] {
         for [t in product_types] {
-            constraint sum[d in 0...n_days : delivery_allowed[d][c]][v in allowed_vehicles](visits_l[d][v][c] * quantity[d][v][c][t]) == demands[c][t];
+            constraint sum[d in 0...n_days : delivery_allowed[d][c]]
+                            [v in allowed_vehicles](visits_l[d][v][c] * quantity[d][v][c][t]) == demands[c][t];
         }
     }
 
@@ -288,7 +294,7 @@ function model() {
     total_costs <- variable_costs + fixed_costs ;
     total_distance <- sum[v in allowed_vehicles][d in 0...n_days](route_dist[d][v]);
 
-    // constraint total_costs <= 430 ;
+    // constraint total_costs <= 455 ;
 
     minimize total_costs ;
 
@@ -430,7 +436,7 @@ function set_current_tours() {
             j = 0 ;
             for [k in 1...current_tours[key].count()-1] {
                 for [c in 0...n] {
-                    if (index_to_centre[c] == current_tours[key][k] - 1) {
+                    if (index_to_centre[c] == current_tours[key][k]) {
                         constraint livraisons[d][v][i] == c;
                         i += 1 ;
                         // init_liv.add(c);
@@ -595,8 +601,13 @@ function callback(ls, cbType) {
         lastBestValue = obj.value;
         lastSolutionWritten = false ;
 
+        perc_fixed = fixed_costs.value/total_costs.value ;
+        perc_var = variable_costs.value/total_costs.value ;
+
         println(
-            "[   ", stats.runningTime, "s] : ", total_costs.value, "E   ", total_distance.value/1000, "km   ", n_used.value, " vehicles"
+            "[   ", stats.runningTime, "s] : ", total_costs.value, "E   (", 
+            round(perc_fixed*100), "%F ", round(perc_var*100), "%V)   ", 
+            total_distance.value/1000, "km   ", n_used.value, " vehicles"
         );
     }
     if (outfile != nil && stats.runningTime - lastBestRunningTime > 5 && !lastSolutionWritten) {

@@ -1,0 +1,449 @@
+{
+    "fixed_costs": 112.692307692308,
+    "total_costs": 650.611405092308,
+    "total_distance": 2086182,
+    "tour_durations": {
+        "0, 0": 6839,
+        "0, 1": 6683,
+        "0, 2": 10914,
+        "0, 3": 11192,
+        "0, 4": 8173,
+        "0, 5": 6683,
+        "0, 6": 5230,
+        "0, 7": 8135,
+        "0, 8": 3329,
+        "1, 0": 16572,
+        "1, 2": 5470,
+        "1, 3": 13412,
+        "1, 4": 14002,
+        "1, 5": 3846,
+        "1, 6": 2672,
+        "1, 7": 8173,
+        "1, 8": 10914,
+        "2, 0": 6908,
+        "2, 2": 7406,
+        "2, 3": 8173,
+        "2, 4": 6791,
+        "2, 5": 10914,
+        "3, 1": 6092,
+        "3, 2": 15447,
+        "3, 3": 10229,
+        "3, 4": 3353,
+        "3, 5": 4223,
+        "3, 6": 6424,
+        "3, 7": 7903,
+        "4, 0": 3329,
+        "4, 2": 7406,
+        "4, 3": 11192,
+        "4, 4": 8173,
+        "4, 5": 13553,
+        "4, 6": 3917,
+        "4, 7": 10914
+    },
+    "tours": {
+        "0, 0": [
+            {
+                "delivery": [0, 0, 0],
+                "index": 26,
+                "name": "Toulouse/Negogousses(Les Arenes)",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            },
+            {
+                "delivery": [0, 0, 0],
+                "index": 17,
+                "name": "Pibrac",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            }
+        ],
+        "0, 1": [
+            {
+                "delivery": [0, 0, 0],
+                "index": 19,
+                "name": "Portet sur Garonne",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            },
+            { "delivery": [0, 0, 0], "index": 16, "name": "Muret", "norvegiennes": 0, "palettes": [0, 0, 0], "type": "Livraison" }
+        ],
+        "0, 2": [
+            {
+                "delivery": [0, 0, 0],
+                "index": 25,
+                "name": "Toulouse/Malepere",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            },
+            { "index": 30, "name": "Leclerc St Orens", "type": "Ramasse" },
+            { "index": 31, "name": "Super U Flourens", "type": "Ramasse" }
+        ],
+        "0, 3": [
+            {
+                "delivery": [0, 0, 0],
+                "index": 26,
+                "name": "Toulouse/Negogousses(Les Arenes)",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            },
+            { "index": 32, "name": "Leclerc Blagnac", "type": "Ramasse" }
+        ],
+        "0, 4": [{ "index": 33, "name": "Leclerc Rouffiac", "type": "Ramasse" }],
+        "0, 5": [
+            {
+                "delivery": [0, 0, 0],
+                "index": 19,
+                "name": "Portet sur Garonne",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            },
+            { "delivery": [0, 0, 0], "index": 16, "name": "Muret", "norvegiennes": 0, "palettes": [0, 0, 0], "type": "Livraison" }
+        ],
+        "0, 6": [
+            {
+                "delivery": [0, 0, 0],
+                "index": 21,
+                "name": "Rieumes",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            }
+        ],
+        "0, 7": [
+            {
+                "delivery": [0, 0, 0],
+                "index": 18,
+                "name": "Plaisance du Touch",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            },
+            {
+                "delivery": [0, 0, 0],
+                "index": 5,
+                "name": "Carbonne",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            }
+        ],
+        "0, 8": [
+            {
+                "delivery": [0, 0, 0],
+                "index": 25,
+                "name": "Toulouse/Malepere",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            }
+        ],
+        "1, 0": [
+            {
+                "delivery": [0, 0, 0],
+                "index": 23,
+                "name": "Salies du Salat/Mane",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            },
+            {
+                "delivery": [0, 0, 0],
+                "index": 22,
+                "name": "Saint-Gaudens",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            },
+            {
+                "delivery": [0, 0, 0],
+                "index": 15,
+                "name": "Montrejeau",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            },
+            {
+                "delivery": [0, 0, 0],
+                "index": 6,
+                "name": "Cazeres",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            }
+        ],
+        "1, 2": [
+            { "delivery": [0, 0, 0], "index": 20, "name": "Revel", "norvegiennes": 0, "palettes": [0, 0, 0], "type": "Livraison" }
+        ],
+        "1, 3": [
+            {
+                "delivery": [0, 0, 0],
+                "index": 15,
+                "name": "Montrejeau",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            },
+            {
+                "delivery": [0, 0, 0],
+                "index": 22,
+                "name": "Saint-Gaudens",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            },
+            {
+                "delivery": [0, 0, 0],
+                "index": 6,
+                "name": "Cazeres",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            }
+        ],
+        "1, 4": [
+            {
+                "delivery": [0, 0, 0],
+                "index": 23,
+                "name": "Salies du Salat/Mane",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            },
+            {
+                "delivery": [0, 0, 0],
+                "index": 22,
+                "name": "Saint-Gaudens",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            },
+            {
+                "delivery": [0, 0, 0],
+                "index": 2,
+                "name": "Bagneres de Luchon",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            }
+        ],
+        "1, 5": [
+            {
+                "delivery": [0, 0, 0],
+                "index": 27,
+                "name": "Tournefeuille",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            }
+        ],
+        "1, 6": [
+            {
+                "delivery": [0, 0, 0],
+                "index": 9,
+                "name": "Fenouillet",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            }
+        ],
+        "1, 7": [{ "index": 33, "name": "Leclerc Rouffiac", "type": "Ramasse" }],
+        "1, 8": [
+            {
+                "delivery": [0, 0, 0],
+                "index": 25,
+                "name": "Toulouse/Malepere",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            },
+            { "index": 30, "name": "Leclerc St Orens", "type": "Ramasse" },
+            { "index": 31, "name": "Super U Flourens", "type": "Ramasse" }
+        ],
+        "2, 0": [{ "index": 35, "name": "Carrefour Supply Chain (A)", "type": "Ramasse" }],
+        "2, 2": [{ "index": 34, "name": "Carrefour Supply Chain", "type": "Ramasse" }],
+        "2, 3": [{ "index": 33, "name": "Leclerc Rouffiac", "type": "Ramasse" }],
+        "2, 4": [{ "index": 29, "name": "Auchan Gramont", "type": "Ramasse" }],
+        "2, 5": [
+            {
+                "delivery": [0, 0, 0],
+                "index": 25,
+                "name": "Toulouse/Malepere",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            },
+            { "index": 30, "name": "Leclerc St Orens", "type": "Ramasse" },
+            { "index": 31, "name": "Super U Flourens", "type": "Ramasse" }
+        ],
+        "3, 1": [
+            {
+                "delivery": [0, 0, 0],
+                "index": 24,
+                "name": "Toulouse/Grande-Bretagne(Casselardit)",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            },
+            {
+                "delivery": [0, 0, 0],
+                "index": 4,
+                "name": "Blagnac",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            }
+        ],
+        "3, 2": [
+            {
+                "delivery": [0, 0, 0],
+                "index": 14,
+                "name": "Levignac",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            },
+            { "index": 30, "name": "Leclerc St Orens", "type": "Ramasse" },
+            { "index": 31, "name": "Super U Flourens", "type": "Ramasse" }
+        ],
+        "3, 3": [
+            {
+                "delivery": [0, 0, 0],
+                "index": 4,
+                "name": "Blagnac",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            },
+            { "index": 32, "name": "Leclerc Blagnac", "type": "Ramasse" }
+        ],
+        "3, 4": [
+            {
+                "delivery": [0, 0, 0],
+                "index": 24,
+                "name": "Toulouse/Grande-Bretagne(Casselardit)",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            }
+        ],
+        "3, 5": [
+            {
+                "delivery": [0, 0, 0],
+                "index": 7,
+                "name": "Cugnaux",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            }
+        ],
+        "3, 6": [
+            {
+                "delivery": [0, 0, 0],
+                "index": 17,
+                "name": "Pibrac",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            },
+            {
+                "delivery": [0, 0, 0],
+                "index": 13,
+                "name": "Leguevin",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            }
+        ],
+        "3, 7": [
+            {
+                "delivery": [0, 0, 0],
+                "index": 28,
+                "name": "Villefranche de Lauragais",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            },
+            {
+                "delivery": [0, 0, 0],
+                "index": 1,
+                "name": "Auterive",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            }
+        ],
+        "4, 0": [
+            {
+                "delivery": [0, 0, 0],
+                "index": 25,
+                "name": "Toulouse/Malepere",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            }
+        ],
+        "4, 2": [{ "index": 34, "name": "Carrefour Supply Chain", "type": "Ramasse" }],
+        "4, 3": [
+            {
+                "delivery": [0, 0, 0],
+                "index": 26,
+                "name": "Toulouse/Negogousses(Les Arenes)",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            },
+            { "index": 32, "name": "Leclerc Blagnac", "type": "Ramasse" }
+        ],
+        "4, 4": [{ "index": 33, "name": "Leclerc Rouffiac", "type": "Ramasse" }],
+        "4, 5": [
+            {
+                "delivery": [0, 0, 0],
+                "index": 8,
+                "name": "Escalquens",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            },
+            {
+                "delivery": [0, 0, 0],
+                "index": 25,
+                "name": "Toulouse/Malepere",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            },
+            { "index": 29, "name": "Auchan Gramont", "type": "Ramasse" }
+        ],
+        "4, 6": [
+            {
+                "delivery": [0, 0, 0],
+                "index": 8,
+                "name": "Escalquens",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            }
+        ],
+        "4, 7": [
+            {
+                "delivery": [0, 0, 0],
+                "index": 25,
+                "name": "Toulouse/Malepere",
+                "norvegiennes": 0,
+                "palettes": [0, 0, 0],
+                "type": "Livraison"
+            },
+            { "index": 30, "name": "Leclerc St Orens", "type": "Ramasse" },
+            { "index": 31, "name": "Super U Flourens", "type": "Ramasse" }
+        ]
+    },
+    "variable_costs": 537.9190974,
+    "vehicles_used": [true, false, true, true, true, true, true, false, false, false, false, false],
+    "week": "EVEN"
+}
