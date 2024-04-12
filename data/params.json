@@ -4,11 +4,12 @@
     "n_norvegiennes": 26,
     "norvegienne_capacity": 40,
     "max_stops": 4,
-    "max_tour_duration": 240,
+    "max_trips": 2,
+    "max_tour_duration": 330,
+    "max_tour_duration_with_pickup": 180,
     "wait_at_centres": 30,
-    "wait_at_pdrs": 45,
-    "week_assignments": [2, 1, 2, 1, 1, 1, 2, 2],
-    "vehicle_allowed": [1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0],
+    "wait_at_pdrs": 30,
+    "vehicle_allowed": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
     "robustness_factor": 1.15,
     "fuel_cost": 1.8
 }

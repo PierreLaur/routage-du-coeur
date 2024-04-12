@@ -1,5 +1,5 @@
 import pandas as pd
-from problem import Solution, Stop, StopType
+from utils.problem import Solution, Stop, StopType
 import folium
 import argparse
 from dash import Dash, html
@@ -235,7 +235,9 @@ def print_to_txt(sol: Solution, output_file_path):
     jours_map = {0: "Lundi", 1: "Mardi", 2: "Mercredi", 3: "Jeudi", 4: "Vendredi"}
 
     output = ""
-    output += f"- - - - - - TOURNEES SEMAINE {sol.week} - - - - - -\n"
+    output += (
+        f"- - - - - - TOURNEES SEMAINE {1 if sol.week == 'ODD' else 2} - - - - - -\n"
+    )
 
     n_days = len(set(k[0] for k in sol.tours))
 
@@ -256,7 +258,10 @@ def print_to_txt(sol: Solution, output_file_path):
             for stop in tour:
                 product_types = ""
                 palettes = ""
-                if stop.type == StopType.Livraison:
+                name = stop.name
+                if stop.index == 0:
+                    name = "    [Retour Dépôt]"
+                elif stop.type == StopType.Livraison:
                     for i, product_type in enumerate("AFS"):
                         deliv = stop.delivery[i]
                         if deliv > 0:
@@ -276,7 +281,7 @@ def print_to_txt(sol: Solution, output_file_path):
                 else:
                     product_types = "Ramasse"
 
-                output += f"\t\t{stop.name:40}\t{product_types}\t{palettes}\n"
+                output += f"\t\t{name:40}\t{product_types}\t{palettes}\n"
 
     output += f"\nCoûts totaux : {sol.total_costs:.0f}€     (Fixes {sol.fixed_costs:.0f}€ | Variables {sol.variable_costs:.0f}€)"
     output += f"\nDistance totale : {round(sol.total_distance/1000):d}km"

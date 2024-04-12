@@ -4,3 +4,8 @@ vrp/
 __pycache__/
 .pytest_cache/
 .vscode/
+data/DR*
+data/vehicules.xlsx
+data/demands
+problems/*
+!problems/*/

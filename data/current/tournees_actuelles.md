@@ -5,7 +5,7 @@ Ramasse Leclerc St Orens
 Ramasse Super U Flourens
 39.7km
 
-Négogousses         -> en fait non ? à vérifier
+Négogousses        
 Ramasse Leclerc Blagnac
 33.9km
 
@@ -55,12 +55,6 @@ St Gaudens
 Luchon
 305km
 
-Salies
-St Gaudens
-Montrejeau
-Cazeres
-246km
-
 Tournefeuille
 35.6km
 
@@ -69,7 +63,6 @@ METRO
 16.6km
 
 Bessieres
-Leclerc Rouffiac
 62.6km
 
 Revel

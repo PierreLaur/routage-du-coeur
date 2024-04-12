@@ -1,4 +1,3 @@
-import argparse
 from dataclasses import dataclass, asdict
 import pandas as pd
 from math import ceil
@@ -24,13 +23,16 @@ class Centre:
     name: str
     allowed_days: set[int]
     delivery_week: DeliveryWeek
-    demands: dict[ProductType, int]
+    demands: list[dict[ProductType, int]]
 
     def to_dict(self):
         d = asdict(self)
         d["allowed_days"] = list(self.allowed_days)
-        d["demands"] = {t.name: self.demands[t] for t in ProductType}
         d["delivery_week"] = self.delivery_week.name
+        d["demands"] = [
+            {t.name: int(demand) for t, demand in scenario.items()}
+            for scenario in self.demands
+        ]
         return d
 
     @classmethod
@@ -40,14 +42,17 @@ class Centre:
             d["name"],
             set(d["allowed_days"]),
             DeliveryWeek[d["delivery_week"]],
-            {ProductType[k]: v for k, v in d["demands"].items()},
+            [
+                {ProductType[k]: v for k, v in scenario.items()}
+                for scenario in d["demands"]
+            ],
         )
 
     def __str__(self) -> str:
-        return f"Centre {self.index} {self.name} [allowed_days={self.allowed_days} delivery_week={self.delivery_week.name} demands={[str(self.demands[t])+t.name for t in ProductType]}"
+        return f"Centre {self.index} {self.name} [allowed_days={self.allowed_days} delivery_week={self.delivery_week.name} demands={[[str(demand)+t.name for t, demand in scenario.items()] for scenario in self.demands]}"
 
     def __repr__(self) -> str:
-        return f"Centre {self.index} {self.name} [allowed_days={self.allowed_days} delivery_week={self.delivery_week.name} demands={[str(self.demands[t])+t.name for t in ProductType]}"
+        return f"Centre {self.index} {self.name} [allowed_days={self.allowed_days} delivery_week={self.delivery_week.name} demands={[[str(demand)+t.name for t, demand in scenario.items()] for scenario in self.demands]}"
 
 
 @dataclass
@@ -117,7 +122,9 @@ class Params:
     n_norvegiennes: int
     norvegienne_capacity: int
     max_stops: int
+    max_trips: int
     max_tour_duration: int
+    max_tour_duration_with_pickup: int
     wait_at_centres: int
     wait_at_pdrs: int
     fuel_cost: float
@@ -136,7 +143,9 @@ class Params:
             d["n_norvegiennes"],
             d["norvegienne_capacity"],
             d["max_stops"],
+            d["max_trips"],
             d["max_tour_duration"],
+            d["max_tour_duration_with_pickup"],
             d["wait_at_centres"],
             d["wait_at_pdrs"],
             d["fuel_cost"],
@@ -301,6 +310,7 @@ class Problem:
     vehicles: list[Vehicle]
     centres: list[Centre]
     pdrs: list[PDR]
+    livraisons_de_ramasses: set[tuple[int, int, int, int]]
     params: Params
 
     def write_as_json(self, path):
@@ -316,6 +326,7 @@ class Problem:
             "vehicles": [v.to_dict() for v in self.vehicles],
             "centres": [c.to_dict() for c in self.centres],
             "pdrs": [p.to_dict() for p in self.pdrs],
+            "livraisons_de_ramasses": list(self.livraisons_de_ramasses),
             "params": self.params.to_dict(),
         }
         json.dump(dict, open(path, "w"))
@@ -334,13 +345,16 @@ class Problem:
             [Vehicle.from_dict(v) for v in dict["vehicles"]],
             [Centre.from_dict(c) for c in dict["centres"]],
             [PDR.from_dict(p) for p in dict["pdrs"]],
+            set([(d, v, trip, c) for d, v, trip, c in dict["livraisons_de_ramasses"]]),
             Params.from_dict(dict["params"]),
         )
 
     @classmethod
     def from_files(
         cls,
-        centres_file,
+        demands_files,
+        allowed_days_file,
+        week_assignments_file,
         points_de_ramasse_file,
         vehicles_file,
         distance_matrix_file,
@@ -352,7 +366,11 @@ class Problem:
     ):
         """Reads the problem from the usual input files and returns a Problem object"""
 
-        centres_df = pd.read_excel(centres_file, index_col=0)
+        demands_dfs = [
+            pd.read_excel(demands_file, index_col=0) for demands_file in demands_files
+        ]
+        allowed_days_df = pd.read_excel(allowed_days_file)
+        week_assignments_df = pd.read_excel(week_assignments_file)
         points_de_ramasse_df = pd.read_excel(points_de_ramasse_file, index_col=0)
         vehicles_df = pd.read_excel(vehicles_file, index_col=0)
         distance_matrix_df = pd.read_excel(distance_matrix_file, index_col=0)
@@ -362,10 +380,12 @@ class Problem:
         )
         params_json = json.load(open(params_file, "r"))
 
-        n_centres = len(centres_df.index)
+        n_centres = len(demands_dfs[0].index)
         n_pdr = len(points_de_ramasse_df.index)
         n_days = 5  # Single week scheduling
         m = len(vehicles_df.index)
+
+        ## Process the vehicles info
 
         capacities = vehicles_df["Capacité (kg)"].astype(int).to_list()
         sizes = vehicles_df["Taille(Palettes)"].astype(int).to_list()
@@ -400,77 +420,43 @@ class Problem:
         for v in range(m):
             if not frais[v] == "Oui":
                 vehicles[v].can_carry.remove(ProductType.F)
-        # # The PL (index 0) can't carry S products
-        vehicles[0].can_carry.remove(ProductType.S)
+        vehicles[0].can_carry.remove(
+            ProductType.S
+        )  # The PL (index 0) can't carry S products
+
+        ## Process the centres info
 
         jours_map = {"Lundi": 0, "Mardi": 1, "Mercredi": 2, "Jeudi": 3, "Vendredi": 4}
-        jours_de_livraison = centres_df["Jours de Livraison possibles"].tolist()
+
+        jours_de_livraison = allowed_days_df["AllowedDays"].tolist()
         jours_de_livraison = [[]] + [
             j.replace(" ", "").split(",") for j in jours_de_livraison[1:]
         ]
         j_de_livraison_possibles = [
             set(map(lambda x: jours_map[x], j)) for j in jours_de_livraison
         ]
-        # j_de_livraison_possibles = [set(range(n_days)) for j in jours_de_livraison]
 
-        demands = {
-            ProductType.A: centres_df["Tonnage Ambiant (kg)"]
-            .fillna(0)
-            .astype(int)
-            .tolist(),
-            ProductType.F: centres_df["Tonnage Frais (kg)"]
-            .fillna(0)
-            .astype(int)
-            .tolist(),
-            ProductType.S: centres_df["Tonnage Surgelé (kg)"]
-            .fillna(0)
-            .astype(int)
-            .tolist(),
-        }
-
-        # Make the demands higher for robustness
-        for c in range(1, n_centres):
-            demands[ProductType.A][c] = ceil(
-                demands[ProductType.A][c] * params_json["robustness_factor"]
-            )
-            demands[ProductType.F][c] = ceil(
-                demands[ProductType.F][c] * params_json["robustness_factor"]
-            )
-            demands[ProductType.S][c] = ceil(
-                demands[ProductType.S][c] * params_json["robustness_factor"]
-            )
-
-        # Demand for depot is set to 0
-        for d in demands.values():
-            d[0] = 0
+        demands = {}
+        for i, demands_df in enumerate(demands_dfs):
+            demands_df *= params_json["robustness_factor"]
+            demands_df = demands_df.astype(int)
+            for c in range(n_centres):
+                demands[i, c] = {
+                    ProductType.A: demands_df.iloc[c, 0],
+                    ProductType.F: demands_df.iloc[c, 1],
+                    ProductType.S: demands_df.iloc[c, 2],
+                }
 
         centres = [
             Centre(
                 i,
-                centres_df["Nom"][i],
+                week_assignments_df["Centre"][i],
                 j_de_livraison_possibles[i],
-                DeliveryWeek(centres_df["Semaine"][i]),
-                {
-                    ProductType.A: demands[ProductType.A][i],
-                    ProductType.F: demands[ProductType.F][i],
-                    ProductType.S: demands[ProductType.S][i],
-                },
+                DeliveryWeek(week_assignments_df["Week"][i]),
+                [demands[scenario, i] for scenario in range(len(demands_dfs))],
             )
             for i in range(n_centres)
         ]
-
-        if custom_assignment:
-            params_json["week_assignment"] = custom_assignment
-
-        # Overwrite week assignments with info from the params file :
-        i = 0
-        for c in range(n_centres):
-            # 0 = every week
-            if centres[c].delivery_week != DeliveryWeek.ANY:
-                centres[c].delivery_week = DeliveryWeek(
-                    params_json["week_assignments"][i]
-                )
-                i += 1
 
         weights = (
             points_de_ramasse_df["Poids par ramasse(kg)"].fillna(0).astype(int).tolist()
@@ -499,6 +485,14 @@ class Problem:
             for i in range(n_pdr)
         ]
 
+        index_malepere = 26
+        livraisons_de_ramasses = {
+            (0, 2, 0, index_malepere),
+            (1, 2, 0, index_malepere),
+            (2, 2, 0, index_malepere),
+            (4, 2, 0, index_malepere),
+        }
+
         params = Params(
             DeliveryWeek(week),
             params_json["max_palette_capacity"],
@@ -506,7 +500,9 @@ class Problem:
             params_json["n_norvegiennes"],
             params_json["norvegienne_capacity"],
             params_json["max_stops"],
+            params_json["max_trips"],
             params_json["max_tour_duration"],
+            params_json["max_tour_duration_with_pickup"],
             params_json["wait_at_centres"],
             params_json["wait_at_pdrs"],
             params_json["fuel_cost"],
@@ -523,52 +519,32 @@ class Problem:
             vehicles,
             centres,
             pdrs,
+            livraisons_de_ramasses,
             params,
         )
 
         return problem
 
+    @property
+    def allowed_vehicles(self):
+        return [v for v in range(self.m) if self.vehicles[v].allowed]
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "centres_file",
-    )
-    parser.add_argument(
-        "points_de_ramasse_file",
-    )
-    parser.add_argument(
-        "vehicles_file",
-    )
-    parser.add_argument(
-        "distance_matrix_file",
-    )
-    parser.add_argument(
-        "duration_matrix_file",
-    )
-    parser.add_argument(
-        "no_traffic_duration_matrix_file",
-    )
-    parser.add_argument(
-        "params_file",
-    )
-    parser.add_argument(
-        "week",
-    )
+    @property
+    def n_nodes(self):
+        return self.n_centres + self.n_pdr
 
-    parser.add_argument("outfile")
+    @property
+    def delivered_centres(self):
+        return [
+            c
+            for c in range(1, self.n_centres)
+            if self.centres[c].delivery_week in [DeliveryWeek.ANY, self.params.week]
+        ]
 
-    args = parser.parse_args()
+    @property
+    def pdr_nodes(self):
+        return range(self.n_centres, self.n_centres + self.n_pdr)
 
-    problem = Problem.from_files(
-        args.centres_file,
-        args.points_de_ramasse_file,
-        args.vehicles_file,
-        args.distance_matrix_file,
-        args.duration_matrix_file,
-        args.no_traffic_duration_matrix_file,
-        args.params_file,
-        int(args.week),
-    )
-
-    problem.write_as_json(args.outfile)
+    @property
+    def used_nodes(self):
+        return [0] + self.delivered_centres + list(self.pdr_nodes)

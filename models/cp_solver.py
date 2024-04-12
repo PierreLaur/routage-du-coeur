@@ -1,75 +1,78 @@
+import json
 from ortools.sat.python import cp_model
 from math import inf, ceil
 from utils.problem import Problem, Solution, DeliveryWeek, ProductType, Stop, StopType
+from utils.plots import print_to_txt
+from typing import Any
+import numpy as np
 
 
 class LogPrinter(cp_model.CpSolverSolutionCallback):
     """Print the current objective values and the optimality gap as the search progresses"""
 
-    def __init__(self, fixed_costs, variable_costs, total_distance, used):
+    def __init__(self, vars):
         cp_model.CpSolverSolutionCallback.__init__(self)
         self.best_solution = inf
-        self.fixed_costs = fixed_costs
-        self.variable_costs = variable_costs
-        self.total_distance = total_distance
-        self.used = used
+        self.vars = vars
 
     def on_solution_callback(self):
-        obj = self.ObjectiveValue()
+        obj = self.objective_value
 
         if obj < self.best_solution:
             self.best_solution = obj
-            if self.BestObjectiveBound() == 0:
+            if self.best_objective_bound == 0:
                 return
             gap = (
                 100
-                * (self.best_solution - self.BestObjectiveBound())
-                / self.BestObjectiveBound()
+                * (self.best_solution - self.best_objective_bound)
+                / self.best_objective_bound
             )
+            n_used = self.value(sum(self.vars.used.values()))
             print(
-                f"{f'[{self.WallTime():.2f}s]':8}  cost={obj:>6.2f}€ ({self.Value(self.fixed_costs):.0f}F {self.Value(self.variable_costs):.0f}V) |"
-                f" n_vehicles={self.Value(sum(self.used.values()))} | dist={self.Value(self.total_distance)/1000:.1f}km   gap = {gap:.2f}% [{self.BestObjectiveBound():.2f}, {obj:.2f}]"
+                f"[CP-SAT] {f'[{self.wall_time:.2f}s]':8}  cost={obj:<8.2f}€ "
+                f"| n_vehicles={n_used:<2} "
+                f"| dist={self.value(self.vars.total_distance)/1000:.1f}km   "
+                f"gap = {gap:.2f}% [{self.best_objective_bound:.2f}, {obj:.2f}]"
             )
 
 
-def add_domsym_breaking(
-    pb: Problem,
-    model,
-    delivers,
-    visits,
-):
-    # Dominance breaking
-    for d, v, c in visits:
-        if c == 0 or c >= pb.n_centres:
-            continue
+class VarContainer:
+    fixed_costs: Any
+    variable_costs: Any
+    total_costs: Any
+    total_distance: Any
 
-        # Visited -> delivery is not 0
-        model.Add(sum(delivers[d, v, c, t] for t in ProductType) > 0).OnlyEnforceIf(
-            visits[d, v, c]
-        )
+    def __init__(self) -> None:
+        self.arcs: dict[tuple[int, int, int], np.ndarray] = {}
+        self.visits: dict[tuple[int, int, int, int], cp_model.IntVar] = {}
+        self.delivers: dict[
+            tuple[int, int, int, int, ProductType], cp_model.IntVar
+        ] = {}
+        self.palettes: dict[tuple[int, int, int, int], cp_model.IntVar] = {}
+        self.demi_palettes: dict[
+            tuple[int, int, int, int, ProductType], cp_model.IntVar
+        ] = {}
+        self.norvegiennes: dict[tuple[int, int, int, int], cp_model.IntVar] = {}
 
-    # # Symmetry breaking
-    for d in range(1, pb.n_days):
-        for v in range(3, 9):
-            if not pb.vehicles[v].allowed:
-                continue
-            model.AddImplication(visits[d, v, 0], visits[d, v - 1, 0])
+        self.route_dist: dict[tuple[int, int], Any] = {}
+        self.tour_duration: dict[tuple[int, int], Any] = {}
+        self.trip_duration: dict[tuple[int, int, int], Any] = {}
+
+        self.used: dict[int, cp_model.IntVar] = {}
 
 
 def add_hint(
     model: cp_model.CpModel,
     problem: Problem,
-    arcs,
-    visits,
-    delivers,
-    palettes,
-    demi_palettes,
-    norvegiennes,
+    vars: VarContainer,
     init_sol: Solution,
 ) -> None:
     """
     Adds an initial solution as a hint to the model.
     """
+
+    print("TODO")
+    exit()
 
     # Iterate over each day and vehicle
     for day in range(problem.n_days):
@@ -80,21 +83,25 @@ def add_hint(
 
             # If the hint for the current day and vehicle is missing or empty, hint the solver to not use the vehicle on this day
             if (day, vehicle) not in init_sol.tours:
-                if problem.vehicles[vehicle].allowed:
-                    model.AddHint(visits[day, vehicle, 0], 0)
+                for trip in range(problem.params.max_trips):
+                    model.add_hint(vars.visits[day, vehicle, trip, 0], 0)
                 continue
+
+            trip = 0
 
             # Create a set of arcs to be assigned
             to_assign = set(
-                (start, end)
+                (trip, start, end)
+                for trip in range(problem.params.max_trips)
                 for start in range(problem.n_centres + problem.n_pdr)
                 for end in range(problem.n_centres + problem.n_pdr)
-                if start != end and (day, vehicle, start, end) in arcs
+                if start != end and (day, vehicle, start, end) in vars.arcs
             )
 
-            # hint the solver to use this vehicle on this day
-            if (day, vehicle, 0) in visits:
-                model.AddHint(visits[day, vehicle, 0], 1)
+            # hint the solver to use this vehicle on this day (at least the first trip)
+            if (day, vehicle, 0, 0) in vars.visits:
+                model.add_hint(vars.visits[day, vehicle, 0, 0], 1)
+
             current_location = 0
 
             # Iterate over each place in the hint tour
@@ -103,9 +110,9 @@ def add_hint(
                 next_location = stop.index
 
                 # Set the hint for the arc from the current location to the next location
-                if (day, vehicle, current_location, next_location) in arcs:
-                    model.AddHint(
-                        arcs[day, vehicle, current_location, next_location][2], 1
+                if (day, vehicle, current_location, next_location) in vars.arcs:
+                    model.add_hint(
+                        vars.arcs[day, vehicle][current_location, next_location], 1
                     )
                     to_assign.remove((current_location, next_location))
                 current_location = next_location
@@ -113,50 +120,85 @@ def add_hint(
                 # Set the hints for the quantities to be delivered at the next location
                 if (
                     next_location < problem.n_centres
-                    and (day, vehicle, next_location) in palettes
+                    and (day, vehicle, next_location) in vars.palettes
                     and problem.centres[next_location].delivery_week
                     in [DeliveryWeek.ANY, problem.params.week]
                 ):
                     for product_type in ProductType:
                         if product_type in problem.vehicles[vehicle].can_carry:
-                            model.AddHint(
-                                delivers[day, vehicle, next_location, product_type],
+                            model.add_hint(
+                                vars.delivers[
+                                    day, vehicle, next_location, product_type
+                                ],
                                 stop.delivery[product_type.value],
                             )
 
                     if ProductType.A in problem.vehicles[vehicle].can_carry:
-                        model.AddHint(
-                            palettes[day, vehicle, next_location],
+                        model.add_hint(
+                            vars.palettes[day, vehicle, next_location],
                             ceil(stop.palettes[0]),
                         )
 
                     if ProductType.F in problem.vehicles[vehicle].can_carry:
-                        model.AddHint(
-                            demi_palettes[day, vehicle, next_location, ProductType.F],
+                        model.add_hint(
+                            vars.demi_palettes[
+                                day, vehicle, next_location, ProductType.F
+                            ],
                             round(stop.palettes[1] * 2),
                         )
 
                     if ProductType.S in problem.vehicles[vehicle].can_carry:
-                        model.AddHint(
-                            norvegiennes[day, vehicle, next_location], stop.norvegiennes
+                        model.add_hint(
+                            vars.norvegiennes[day, vehicle, next_location],
+                            stop.norvegiennes,
                         )
                         if problem.vehicles[vehicle].allows_isotherm_cover:
-                            model.AddHint(
-                                demi_palettes[
+                            model.add_hint(
+                                vars.demi_palettes[
                                     day, vehicle, next_location, ProductType.S
                                 ],
                                 round(stop.palettes[2] * 2),
                             )
 
             # Set the hint for the arc from the current location back to the depot
-            if (day, vehicle, current_location, 0) in arcs:
-                model.AddHint(arcs[day, vehicle, current_location, 0][2], 1)
+            if (day, vehicle, current_location, 0) in vars.arcs:
+                model.add_hint(vars.arcs[day, vehicle][current_location, 0], 1)
                 to_assign.remove((current_location, 0))
 
             # Hint to not use any remaining arcs
             for start, end in to_assign:
-                if (day, vehicle, start, end) in arcs:
-                    model.AddHint(arcs[day, vehicle, start, end][2], 0)
+                if (day, vehicle, start, end) in vars.arcs:
+                    model.add_hint(vars.arcs[day, vehicle][start, end], 0)
+
+
+def set_current_tours(
+    pb: Problem,
+    model: cp_model.CpModel,
+    vars: VarContainer,
+):
+    """Sets the current tours as a hint to the solver"""
+    with open(
+        f"data/current/tours_tournees_actuelles_w{pb.params.week.value}.json", "r"
+    ) as f:
+        tours = json.load(f)
+        for d in range(pb.n_days):
+            for v in range(pb.m):
+                key = f"({d}, {v})"
+                if key in tours:
+                    for trip in range(pb.params.max_trips):
+                        for c in range(1, pb.n_centres + pb.n_pdr):
+                            if (d, v, c) not in vars.visits:
+                                continue
+
+                            if c in tours[key][1:-1]:
+                                model.add_hint(vars.visits[d, v, trip, c], 1)
+                            else:
+                                model.add_hint(vars.visits[d, v, trip, c], 0)
+                else:
+                    for trip in range(pb.params.max_trips):
+                        for c in range(pb.n_centres + pb.n_pdr):
+                            if (d, v, c) in vars.visits:
+                                model.add_hint(vars.visits[d, v, trip, c], 0)
 
 
 def prune_arcs(n_nodes, matrix, limit=1.0):
@@ -170,42 +212,46 @@ def prune_arcs(n_nodes, matrix, limit=1.0):
     return pruned
 
 
-def read_tours(pb: Problem, arcs, solver):
+def read_tours(pb: Problem, vars: VarContainer, solver):
     """Reads tours from the solver
     Returns a dictionary of tours with keys (day, vehicle)"""
-    tours = {}
+    tours: dict[tuple[int, int], list[int]] = {}
     for d in range(pb.n_days):
-        for v in range(pb.m):
-            tour = [0]
+        for v in pb.allowed_vehicles:
+            tours[d, v] = []
+            for trip in range(pb.params.max_trips):
+                if not solver.value(vars.visits[d, v, trip, 0]):
+                    continue
 
-            while True:
-                a = tour[-1]
-                goes_to = set()
+                tour = [0]
+                while True:
+                    a = tour[-1]
+                    goes_to = set()
 
-                for b in range(1, pb.n_centres + pb.n_pdr):
-                    if a == b:
-                        continue
-                    if (d, v, a, b) not in arcs:
-                        continue
-                    arc = arcs[d, v, a, b]
+                    for b in range(pb.n_centres + pb.n_pdr):
+                        if a == b:
+                            continue
+                        arc = vars.arcs[d, v, trip][a, b]
 
-                    if solver.Value(arc[2]):
-                        goes_to.add(b)
+                        if solver.value(arc):
+                            goes_to.add(b)
 
-                if len(goes_to) > 1:
-                    print("Warning : ", d, v, a, "goes to ", goes_to)
-                if len(goes_to) == 0:
-                    break
+                    if len(goes_to) > 1:
+                        print("Warning : ", d, v, a, "goes to ", goes_to)
+                    if len(goes_to) == 0:
+                        if a != 0:
+                            print("Warning : ", d, v, a, "goes nowhere ")
+                        break
+                    goto = goes_to.pop()
+                    if goto == 0:
+                        break
+                    tour.append(goto)
 
-                tour.append(goes_to.pop())
-                if tour[-1] == 0:
-                    break
+                if len(tour) == 1:
+                    continue
 
-            tour.append(0)
-
-            if len(tour) == 2:
-                continue
-            tours[d, v] = tour
+                tours[d, v] += tour
+            tours[d, v].append(0)
     return tours
 
 
@@ -220,6 +266,9 @@ def post_process(
 ):
     """Shaves any superfluous decisions (useless norvegiennes/palettes) from the solution
     Also adds the time required to come back to the depot to the tour duration"""
+
+    print("TODO: post process")
+    return
 
     for (d, v), tour in tours.items():
         # Remove any useless norvegiennes and demi palettes for s products
@@ -263,7 +312,9 @@ def post_process(
             new_n_demi_palettes = max(
                 0,
                 ceil(
-                    delivers[d, v, c, ProductType.F] / pb.params.demi_palette_capacity
+                    2
+                    * delivers[d, v, c, ProductType.F]
+                    / pb.params.demi_palette_capacity
                 ),
             )
 
@@ -283,102 +334,12 @@ def post_process(
             if palettes[d, v, c] != new_n_palettes:
                 palettes[d, v, c] = new_n_palettes
 
-    for d, v in tour_duration:
-        tour_duration[d, v] += pb.duration_matrix.iloc[tours[d, v][-2], 0]
 
-
-def add_specific_requirements(pb: Problem, model: cp_model.CpModel, visits):
-    """
-    Adds a few "hard-coded" constraints
-    These are not written in the input files but have been specified by the client
-    """
-
-    # The PL must visit Carrefour Centrale on Wednesday
-    # He must only do one pickup
-    carrefour_centrale_index = pb.n_centres + 5
-    carrefour_centrale_a_index = pb.n_centres + 6
-    model.Add(visits[2, 0, carrefour_centrale_a_index] == 1)
-    model.AddBoolAnd(
-        visits[2, 0, p].Not()
-        for p in range(pb.n_centres, pb.n_centres + pb.n_pdr)
-        if p != carrefour_centrale_a_index
-    )
-
-    # The first camion Frigo must visit Carrefour Centrale on Wednesday and Friday
-    # To simplify we say it only does one pickup (in reality he delivers a centre afterwards)
-    model.Add(visits[2, 2, carrefour_centrale_index] == 1)
-    model.AddBoolAnd(
-        visits[2, 2, p].Not()
-        for p in range(pb.n_centres, pb.n_centres + pb.n_pdr)
-        if p != carrefour_centrale_index
-    )
-
-    model.Add(visits[4, 2, carrefour_centrale_index] == 1)
-    model.AddBoolAnd(
-        visits[4, 2, p].Not()
-        for p in range(pb.n_centres, pb.n_centres + pb.n_pdr)
-        if p != carrefour_centrale_index
-    )
-
-    # # Redundant
-    model.AddBoolAnd(
-        visits[d, v, carrefour_centrale_a_index].Not()
-        for d in range(pb.n_days)
-        for v in range(pb.m)
-        if (d, v, carrefour_centrale_a_index) in visits and (d, v) != (2, 0)
-    )
-
-    # The PL cannot deliver Toulouse/Grande-Bretagne
-    index_gde_bretagne = 24
-    model.AddBoolAnd(visits[d, 0, index_gde_bretagne].Not() for d in range(pb.n_days))
-
-    # A camion frigo must deliver Revel on Tuesdays and do nothing else
-    index_revel = 20
-    model.AddBoolAnd(
-        visits[1, 2, node] if node == index_revel else visits[1, 2, node].Not()
-        for node in range(1, pb.n_centres + pb.n_pdr)
-        if (1, 2, node) in visits
-    )
-
-    model.AddBoolAnd(
-        visits[d, v, index_revel].Not()
-        for d in range(pb.n_days)
-        for v in range(pb.m)
-        if pb.vehicles[v].allowed and v != 2
-    )
-
-    # A Camion Frigo must deliver Les Arènes on Friday then pickup Leclerc Blagnac
-    index_lc_blagnac = pb.n_centres + 3
-    index_arenes = 26
-    model.Add(visits[4, 3, index_arenes] == 1)
-    model.Add(visits[4, 3, index_lc_blagnac] == 1)
-
-
-def solve_vrp(
-    pb: Problem,
-    hint=None,
-    outfile=None,
-    time_limit=None,
-    violation_cost=None,
-    predefined_visits=None,
-):
-    """Creates a CP model and solves it with cp-sat.
-    When done, re-optimizes the solution and writes it in JSON format to the specified file
-    """
-
-    print("Modeling...")
-
-    model = cp_model.CpModel()
-
-    n_nodes = pb.n_centres + pb.n_pdr
-    allowed_vehicles = [v for v in range(pb.m) if pb.vehicles[v].allowed]
-    delivered_centres = [
-        c
-        for c in range(1, pb.n_centres)
-        if pb.centres[c].delivery_week in [DeliveryWeek.ANY, pb.params.week]
-    ]
-    pdr_nodes = range(pb.n_centres, pb.n_centres + pb.n_pdr)
-    used_nodes = [0] + delivered_centres + list(pdr_nodes)
+def create_tour_variables(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
+    """Creates arcs and visits variables and loads them into the VarContainer and the model"""
+    n_nodes = pb.n_nodes
+    used_nodes = pb.used_nodes
+    allowed_vehicles = pb.allowed_vehicles
 
     # Optionally prune some long arcs to make solving easier
     pruned = prune_arcs(n_nodes, pb.distance_matrix, limit=1)
@@ -386,376 +347,671 @@ def solve_vrp(
         print(f"    Pruned arcs : {100*len(pruned)/(n_nodes)**2:.2f}%")
 
     ########## Arcs & Visit variables ###########
-    visits = {}
-    arcs = {}
-
     for d in range(pb.n_days):
         for v in allowed_vehicles:
-            for node in used_nodes:
-                if predefined_visits and node != 0:
-                    visits[d, v, node] = model.NewConstant(
-                        predefined_visits[d, v, node]
-                    )
-                else:
-                    visits[d, v, node] = model.NewBoolVar(
-                        "visits_%i_%i_%i" % (d, v, node)
-                    )
-
-                # Add an arc from the node to itself (necessary for Circuit constraints)
-                # If used, the node is not visited
-                arcs[d, v, node, node] = (node, node, visits[d, v, node].Not())
-
-                for node2 in used_nodes:
-                    if node == node2:
-                        continue
-                    if (node, node2) in pruned:
-                        continue
-                    # No arc from pdr to centre (except depot) - we do deliveries first then pickups
-                    elif node >= pb.n_centres and 0 < node2 and node2 < pb.n_centres:
-                        continue
+            for trip in range(pb.params.max_trips):
+                vars.arcs[d, v, trip] = np.array(
+                    [
+                        [model.new_constant(0) for _ in range(n_nodes)]
+                        for _ in range(n_nodes)
+                    ]
+                )
+                for node in used_nodes:
+                    # pickup only on the first trip
+                    if trip > 0 and node >= pb.n_centres:
+                        vars.visits[d, v, trip, node] = model.new_constant(0)
                     else:
-                        lit = model.NewBoolVar("")
-                        arcs[d, v, node, node2] = (node, node2, lit)
+                        vars.visits[d, v, trip, node] = model.new_bool_var(
+                            "visits_%i_%i_%i_%i" % (d, v, trip, node)
+                        )
 
-            # If you don't visit the depot, visit nothing
-            model.AddBoolAnd(
-                visits[d, v, node].Not()
-                for node in delivered_centres
-                + list(range(pb.n_centres, pb.n_centres + pb.n_pdr))
-            ).OnlyEnforceIf(visits[d, v, 0].Not())
+                    # Add an arc from the node to itself (necessary for Circuit constraints)
+                    # If used, the node is not visited
+                    vars.arcs[d, v, trip][node, node] = vars.visits[
+                        d, v, trip, node
+                    ].negated()
 
-            model.AddCircuit(
-                [
-                    arcs[d, v, node1, node2]
-                    for node1 in used_nodes
-                    for node2 in used_nodes
-                    if (d, v, node1, node2) in arcs
-                ]
-            )
+                    for node2 in used_nodes:
+                        if node == node2:
+                            continue
+                        if (node, node2) in pruned:
+                            continue
+                        # No arc from pdr to centre (except depot) - we do deliveries first then pickups
+                        elif (
+                            node >= pb.n_centres and 0 < node2 and node2 < pb.n_centres
+                        ):
+                            continue
+                        else:
+                            vars.arcs[d, v, trip][node, node2] = model.new_bool_var("")
+
+                # If you don't visit the depot, visit nothing
+                model.add_bool_and(
+                    vars.visits[d, v, trip, node].negated()
+                    for node in pb.delivered_centres
+                    + list(range(pb.n_centres, pb.n_centres + pb.n_pdr))
+                ).only_enforce_if(vars.visits[d, v, trip, 0].negated())
+
+                # Trips should be done in order
+                for prev_trip in range(trip):
+                    model.add_implication(
+                        vars.visits[d, v, trip, 0], vars.visits[d, v, prev_trip, 0]
+                    )
+
+                model.add_circuit(
+                    [
+                        (node1, node2, vars.arcs[d, v, trip][node1, node2])
+                        for node1 in used_nodes
+                        for node2 in used_nodes
+                    ]
+                )
+
+
+def create_load_variables(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
+    """Creates the deliveries, palettes and norvegiennes variables and loads them into the VarContainer and the model"""
 
     ########## Load variables & constraints ###########
-    delivers = {}
-    palettes = {}
-    demi_palettes = {}
-    norvegiennes = {}
     for d in range(pb.n_days):
-        for v in allowed_vehicles:
-            for c in delivered_centres:
-                for t in ProductType:
-                    delivers[d, v, c, t] = (
-                        model.NewIntVar(
-                            0,
-                            min(pb.vehicles[v].capacity, pb.centres[c].demands[t]),
-                            "",
+        for v in pb.allowed_vehicles:
+            for trip in range(pb.params.max_trips):
+                for c in pb.delivered_centres:
+                    for t in ProductType:
+                        max_demands = max(
+                            scenario[t] for scenario in pb.centres[c].demands
                         )
-                        if t in pb.vehicles[v].can_carry
-                        else model.NewConstant(0)
+                        vars.delivers[d, v, trip, c, t] = (
+                            model.new_int_var(
+                                0,
+                                min(pb.vehicles[v].capacity, max_demands),
+                                "",
+                            )
+                            if t in pb.vehicles[v].can_carry
+                            else model.new_constant(0)
+                        )
+
+                    vars.palettes[d, v, trip, c] = model.new_int_var(
+                        0, pb.vehicles[v].size, ""
                     )
 
-                palettes[d, v, c] = model.NewIntVar(0, pb.vehicles[v].size, "")
-
-                demi_palettes[d, v, c, ProductType.F] = (
-                    model.NewIntVar(0, 2 * pb.vehicles[v].size, "")
-                    if ProductType.F in pb.vehicles[v].can_carry
-                    else model.NewConstant(0)
-                )
-
-                demi_palettes[d, v, c, ProductType.S] = (
-                    model.NewIntVar(0, 2 * pb.vehicles[v].size, "")
-                    if ProductType.S in pb.vehicles[v].can_carry
-                    and pb.vehicles[v].allows_isotherm_cover
-                    else model.NewConstant(0)
-                )
-
-                norvegiennes[d, v, c] = (
-                    model.NewIntVar(0, pb.params.n_norvegiennes, "")
-                    if ProductType.S in pb.vehicles[v].can_carry
-                    else model.NewConstant(0)
-                )
-
-                # Use an appropriate number of palettes for each type of product
-                model.Add(
-                    palettes[d, v, c] * pb.params.max_palette_capacity
-                    >= delivers[d, v, c, ProductType.A]
-                )
-                model.Add(
-                    demi_palettes[d, v, c, ProductType.F]
-                    * pb.params.demi_palette_capacity
-                    >= delivers[d, v, c, ProductType.F]
-                )
-                model.Add(
-                    demi_palettes[d, v, c, ProductType.S]
-                    * pb.params.demi_palette_capacity
-                    + norvegiennes[d, v, c] * pb.params.norvegienne_capacity
-                    >= delivers[d, v, c, ProductType.S]
-                )
-
-                # Not visited -> delivery is 0
-                model.Add(palettes[d, v, c] == 0).OnlyEnforceIf(visits[d, v, c].Not())
-                for t in [ProductType.F, ProductType.S]:
-                    model.Add(demi_palettes[d, v, c, t] == 0).OnlyEnforceIf(
-                        visits[d, v, c].Not()
-                    )
-                model.Add(norvegiennes[d, v, c] == 0).OnlyEnforceIf(
-                    visits[d, v, c].Not()
-                )
-                for t in ProductType:
-                    model.Add(delivers[d, v, c, t] == 0).OnlyEnforceIf(
-                        visits[d, v, c].Not()
-                    )
-                    model.Add(delivers[d, v, c, t] == 0).OnlyEnforceIf(
-                        visits[d, v, c].Not()
-                    )
-                    model.Add(delivers[d, v, c, t] == 0).OnlyEnforceIf(
-                        visits[d, v, c].Not()
+                    vars.demi_palettes[d, v, trip, c, ProductType.F] = (
+                        model.new_int_var(0, 2 * pb.vehicles[v].size, "")
+                        if ProductType.F in pb.vehicles[v].can_carry
+                        else model.new_constant(0)
                     )
 
-    ########## Time  windows ###########
-    violations = (
-        {c: model.NewBoolVar("") for c in delivered_centres} if violation_cost else {}
-    )  # violations on allowed delivery days can optionally be made soft
+                    vars.demi_palettes[d, v, trip, c, ProductType.S] = (
+                        model.new_int_var(0, 2 * pb.vehicles[v].size, "")
+                        if ProductType.S in pb.vehicles[v].can_carry
+                        and pb.vehicles[v].allows_isotherm_cover
+                        else model.new_constant(0)
+                    )
+
+                    vars.norvegiennes[d, v, trip, c] = (
+                        model.new_int_var(0, pb.params.n_norvegiennes, "")
+                        if ProductType.S in pb.vehicles[v].can_carry
+                        else model.new_constant(0)
+                    )
+
+
+def create_duration_variables(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
+    delivered_centres = pb.delivered_centres
+    pdr_nodes = pb.pdr_nodes
+    for d in range(pb.n_days):
+        for v in pb.allowed_vehicles:
+            for trip in range(pb.params.max_trips):
+                vars.trip_duration[d, v, trip] = np.sum(
+                    pb.duration_matrix.values * vars.arcs[d, v, trip]
+                ) + 60 * (
+                    pb.params.wait_at_centres
+                    * sum(vars.visits[d, v, trip, c] for c in delivered_centres)
+                    + pb.params.wait_at_pdrs
+                    * sum(vars.visits[d, v, trip, p] for p in pdr_nodes)
+                )  # type: ignore
+
+            vars.route_dist[d, v] = sum(
+                np.sum(pb.distance_matrix.values * vars.arcs[d, v, trip])
+                for trip in range(pb.params.max_trips)
+            )
+            vars.tour_duration[d, v] = sum(
+                vars.trip_duration[d, v, trip] for trip in range(pb.params.max_trips)
+            ) + sum(
+                vars.visits[d, v, trip, 0] * pb.params.wait_at_centres * 60
+                for trip in range(1, pb.params.max_trips)  # type: ignore
+            )
+
+
+def add_load_constraints(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
+    """Adds the deliveries, palettes and norvegiennes constraints to the model"""
+    for d in range(pb.n_days):
+        for v in pb.allowed_vehicles:
+            for trip in range(pb.params.max_trips):
+                for c in pb.delivered_centres:
+                    # Use an appropriate number of palettes for each type of product
+                    model.add(
+                        vars.palettes[d, v, trip, c] * pb.params.max_palette_capacity
+                        >= vars.delivers[d, v, trip, c, ProductType.A]
+                    )
+                    # Use twice the required number of demi palettes for F - this is for fruits & vegetables
+                    model.add(
+                        vars.demi_palettes[d, v, trip, c, ProductType.F]
+                        * pb.params.demi_palette_capacity
+                        >= 2 * vars.delivers[d, v, trip, c, ProductType.F]  # type: ignore
+                    )
+
+                    model.add(
+                        vars.demi_palettes[d, v, trip, c, ProductType.S]
+                        * pb.params.demi_palette_capacity
+                        + vars.norvegiennes[d, v, trip, c]
+                        * pb.params.norvegienne_capacity
+                        >= vars.delivers[d, v, trip, c, ProductType.S]  # type: ignore
+                    )
+
+                    # Not visited -> delivery is 0
+                    model.add(vars.palettes[d, v, trip, c] == 0).only_enforce_if(
+                        vars.visits[d, v, trip, c].negated()
+                    )
+                    for t in [ProductType.F, ProductType.S]:
+                        model.add(
+                            vars.demi_palettes[d, v, trip, c, t] == 0
+                        ).only_enforce_if(vars.visits[d, v, trip, c].negated())
+                    model.add(vars.norvegiennes[d, v, trip, c] == 0).only_enforce_if(
+                        vars.visits[d, v, trip, c].negated()
+                    )
+                    for t in ProductType:
+                        model.add(vars.delivers[d, v, trip, c, t] == 0).only_enforce_if(
+                            vars.visits[d, v, trip, c].negated()
+                        )
+                        model.add(vars.delivers[d, v, trip, c, t] == 0).only_enforce_if(
+                            vars.visits[d, v, trip, c].negated()
+                        )
+                        model.add(vars.delivers[d, v, trip, c, t] == 0).only_enforce_if(
+                            vars.visits[d, v, trip, c].negated()
+                        )
+
+
+def add_time_windows(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
+    allowed_vehicles = pb.allowed_vehicles
 
     for d in range(pb.n_days):
         for pdr in range(pb.n_pdr):
             # Visit each exactly once on each required days with an appropriate vehicle
             if d in pb.pdrs[pdr].required_days:
                 model.AddExactlyOne(
-                    visits[d, v, pdr + pb.n_centres]
+                    vars.visits[d, v, trip, pdr + pb.n_centres]
                     for v in allowed_vehicles
+                    for trip in range(pb.params.max_trips)
                     if pb.pdrs[pdr].product_type in pb.vehicles[v].can_carry
                 )
 
                 # Disallow any ramasses with vehicles that cannot carry that type of product
-                model.AddBoolAnd(
-                    visits[d, v, pdr + pb.n_centres].Not()
+                model.add_bool_and(
+                    vars.visits[d, v, trip, pdr + pb.n_centres].negated()
                     for v in allowed_vehicles
+                    for trip in range(pb.params.max_trips)
                     if pb.pdrs[pdr].product_type not in pb.vehicles[v].can_carry
                 )
             else:
                 # Do not visit them if not required (this seems to improve pruning)
-                model.AddBoolAnd(
-                    [visits[d, v, pdr + pb.n_centres].Not() for v in allowed_vehicles]
+                model.add_bool_and(
+                    [
+                        vars.visits[d, v, trip, pdr + pb.n_centres].negated()
+                        for v in allowed_vehicles
+                        for trip in range(pb.params.max_trips)
+                    ]
                 )
 
     # Only deliver centres on allowed days
-    for c in delivered_centres:
+    for c in pb.delivered_centres:
         for d in range(pb.n_days):
             if d not in pb.centres[c].allowed_days:
-                if violation_cost:
-                    model.AddBoolAnd(
-                        visits[d, v, c].Not() for v in allowed_vehicles
-                    ).OnlyEnforceIf(violations[c].Not())
-                else:
-                    model.AddBoolAnd([visits[d, v, c].Not() for v in allowed_vehicles])
-
-    for c in delivered_centres:
-        # Redundant Cover constraint
-        min_visits = max(
-            ceil(sum(pb.centres[c].demands.values()) / pb.vehicles[2].capacity),
-            ceil(
-                (
-                    2
-                    * ceil(
-                        pb.centres[c].demands[ProductType.A]
-                        / pb.params.max_palette_capacity
-                    )
-                    + ceil(
-                        pb.centres[c].demands[ProductType.F]
-                        / pb.params.demi_palette_capacity
-                    )
+                model.add_bool_and(
+                    [
+                        vars.visits[d, v, trip, c].negated()
+                        for v in allowed_vehicles
+                        for trip in range(pb.params.max_trips)
+                        if (d, v, trip, c) not in pb.livraisons_de_ramasses
+                    ]
                 )
-                / pb.vehicles[2].size
-            ),
-            1,
+
+
+def add_cover_constraints(pb: Problem, model, vars: VarContainer, loose: bool = False):
+    fourgon_capacity = 1200
+    for c in pb.delivered_centres:
+        # Redundant Cover constraint
+        max_sum_demands = max(
+            sum(scenario.values()) for scenario in pb.centres[c].demands
         )
 
-        # Heuristic pruning rule (very effective)
-        sum_demands = sum(pb.centres[c].demands.values())
-        max_visits = ceil(sum_demands / pb.params.max_palette_capacity)
+        if max_sum_demands > fourgon_capacity:
+            min_visits = 2
+        else:
+            min_visits = 1
 
-        model.AddLinearConstraint(
+        # Heuristic pruning rule (very effective)
+        max_visits = ceil(max_sum_demands / pb.params.max_palette_capacity)
+
+        # more than 4 visits is unreasonable in practice
+        max_visits = min(max_visits, 4)
+
+        if loose:
+            # needed for the current tours to satisfy this constraint
+            print("loose pruning")
+            if c == 22:
+                max_visits = 2
+            if c == 23:
+                max_visits = 3
+            if c == 15:
+                max_visits = 2
+            if c == 6:
+                max_visits = 2
+            if c == 7:
+                min_visits = 1
+            if c == 16:
+                max_visits = 2
+
+        model.add_linear_constraint(
             sum(
-                visits[d, v, c]
+                vars.visits[d, v, trip, c]
                 for d in range(pb.n_days)
-                for v in allowed_vehicles
+                for v in pb.allowed_vehicles
+                for trip in range(pb.params.max_trips)
                 if d in pb.centres[c].allowed_days
+                and (d, v, c) not in pb.livraisons_de_ramasses
             ),
             min_visits,
             max_visits,
         )
 
+
+def add_demand_constraints(
+    pb: Problem, model: cp_model.CpModel, vars: VarContainer, loose=False
+):
     # Every customer must be served his demand
-    for c in delivered_centres:
+    for c in pb.delivered_centres:
+        if loose:
+            if c in [
+                10,  # Fonsorbes AFS (+ Muret FS + Portet FS) trop pour 1 seul CF
+                17,  # Pibrac : F/S trop pour 1 seul CF
+                26,  # Les Arenes : F/S trop pour 1 seul CF
+                25,  # Malepere FS + Escalquens AFS trop pour 2 CFs
+            ]:  # These centres have too much demand for the current tours
+                print("Relaxing ", pb.centres[c].name, pb.centres[c].demands)
+                continue
+
         for type in ProductType:
-            model.Add(
+            model.add(
                 sum(
-                    delivers[d, v, c, type]
-                    for v in allowed_vehicles
+                    vars.delivers[d, v, trip, c, type]
+                    for v in pb.allowed_vehicles
+                    for trip in range(pb.params.max_trips)
                     for d in range(pb.n_days)
                 )
-                == pb.centres[c].demands[type]
+                == pb.centres[c].demands[0][type]
             )
 
+
+def add_robust_demand_constraints(
+    pb: Problem, model: cp_model.CpModel, vars: VarContainer
+):
+    for c in pb.delivered_centres:
+        for type in ProductType:
+            model.add(
+                sum(
+                    vars.delivers[d, v, trip, c, type]
+                    for v in pb.allowed_vehicles
+                    for trip in range(pb.params.max_trips)
+                    for d in range(pb.n_days)
+                )
+                == max(scenario[type] for scenario in pb.centres[c].demands)
+            )
+
+
+def add_stochastic_demand_constraints(
+    pb: Problem, model: cp_model.CpModel, vars: VarContainer, percentage=1.0
+):
+    satisfied = [model.new_bool_var("") for _ in range(len(pb.centres[1].demands))]
+    for c in pb.delivered_centres:
+        for i, scenario in enumerate(pb.centres[c].demands):
+            for type in ProductType:
+                model.add(
+                    sum(
+                        vars.delivers[d, v, trip, c, type]
+                        for v in pb.allowed_vehicles
+                        for trip in range(pb.params.max_trips)
+                        for d in range(pb.n_days)
+                    )
+                    >= scenario[type]
+                ).only_enforce_if(satisfied[i])
+
+    model.add(sum(satisfied) >= ceil(len(satisfied) * percentage))
+
+
+def add_capacity_constraints(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
+    delivered_centres = pb.delivered_centres
+    allowed_vehicles = pb.allowed_vehicles
     # Capacity constraints
     for d in range(pb.n_days):
-        model.Add(
+        model.add(
             sum(
-                norvegiennes[d, v, c]
+                vars.norvegiennes[d, v, trip, c]
                 for v in allowed_vehicles
+                for trip in range(pb.params.max_trips)
                 for c in delivered_centres
             )
             <= pb.params.n_norvegiennes
         )
 
         for v in allowed_vehicles:
-            # Delivery
-            model.Add(
-                sum(
-                    delivers[d, v, c, t] for c in delivered_centres for t in ProductType
+            for trip in range(pb.params.max_trips):
+                # Delivery
+                model.add(
+                    sum(
+                        vars.delivers[d, v, trip, c, t]
+                        for c in delivered_centres
+                        for t in ProductType
+                    )
+                    <= pb.vehicles[v].capacity
                 )
-                <= pb.vehicles[v].capacity
-            )
 
-            # Pickup
-            model.Add(
-                sum(
-                    pb.pdrs[p].weight * visits[d, v, p + pb.n_centres]
-                    for p in range(pb.n_pdr)
+                # Pickup
+                model.add(
+                    sum(
+                        pb.pdrs[p].weight * vars.visits[d, v, trip, p + pb.n_centres]
+                        for p in range(pb.n_pdr)
+                    )
+                    <= pb.vehicles[v].capacity
                 )
-                <= pb.vehicles[v].capacity
-            )
 
-            # Size limits
-            model.Add(
-                sum(
-                    2 * palettes[d, v, c]
-                    + demi_palettes[d, v, c, ProductType.F]
-                    + demi_palettes[d, v, c, ProductType.S]
-                    for c in delivered_centres
+                # Size limits
+                model.add(
+                    sum(
+                        2 * vars.palettes[d, v, trip, c]
+                        + vars.demi_palettes[d, v, trip, c, ProductType.F]
+                        + vars.demi_palettes[d, v, trip, c, ProductType.S]  # type: ignore
+                        for c in delivered_centres
+                    )
+                    <= 2 * pb.vehicles[v].size
                 )
-                <= 2 * pb.vehicles[v].size
-            )
 
-            # Two palettes per pickup
-            model.Add(
-                sum(2 * visits[d, v, p] for p in pdr_nodes) <= pb.vehicles[v].size
-            )
+                # Two palettes per pickup
+                model.add(
+                    sum(2 * vars.visits[d, v, trip, p] for p in pb.pdr_nodes)
+                    <= pb.vehicles[v].size
+                )
+
+
+def add_duration_constraints(
+    pb: Problem, model: cp_model.CpModel, vars: VarContainer, loose=False
+):
+    delivered_centres = pb.delivered_centres
+    pdr_nodes = pb.pdr_nodes
 
     # Duration constraints
-    route_dist = {}
-    tour_duration = {}
     for d in range(pb.n_days):
-        for v in allowed_vehicles:
-            vd_arcs = [
-                arcs[d2, v2, a, b]
-                for (d2, v2, a, b) in arcs.keys()
-                if d2 == d and v2 == v
-            ]
+        for v in pb.allowed_vehicles:
+            if loose and (d, v) in [(1, 0), (1, 7), (3, 2)]:
+                continue
 
-            route_dist[d, v] = sum(
-                arc[2] * pb.distance_matrix.iloc[arc[0], arc[1]] for arc in vd_arcs
-            )
+            pickups = model.new_bool_var("")
+            model.add_bool_and(
+                vars.visits[d, v, 0, p].negated() for p in pdr_nodes
+            ).only_enforce_if(pickups)
+            model.add(
+                vars.trip_duration[d, v, 0]
+                <= pb.params.max_tour_duration_with_pickup * 60
+            ).only_enforce_if(pickups)
 
-            tour_duration[d, v] = sum(
-                arc[2] * pb.duration_matrix.iloc[arc[0], arc[1]]
-                for arc in vd_arcs
-                if arc[1] != 0  # The trip back to the depot is not counted
-            ) + 60 * (
-                pb.params.wait_at_centres
-                * sum(visits[d, v, c] for c in delivered_centres)
-                + pb.params.wait_at_pdrs * sum(visits[d, v, p] for p in pdr_nodes)
-            )
+            model.add(vars.tour_duration[d, v] <= pb.params.max_tour_duration * 60)
 
-            model.Add(tour_duration[d, v] <= pb.params.max_tour_duration * 60)
-            model.Add(
-                sum(visits[d, v, node] for node in delivered_centres + list(pdr_nodes))
+            model.add(
+                sum(
+                    vars.visits[d, v, trip, node]
+                    for node in delivered_centres + list(pdr_nodes)
+                    for trip in range(pb.params.max_trips)
+                )
                 <= pb.params.max_stops
             )
 
-    add_specific_requirements(pb, model, visits)
-    add_domsym_breaking(pb, model, delivers, visits)
 
-    # Add input file as a hint
-    if hint:
-        add_hint(
-            model,
-            pb,
-            arcs,
-            visits,
-            delivers,
-            palettes,
-            demi_palettes,
-            norvegiennes,
-            hint,
-        )
+def add_specific_requirements(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
+    """
+    Adds a few "hard-coded" constraints
+    These are not written in the input files but have been specified by the client
+    """
 
-    # Objectives
-    total_distance = sum(
-        arc[2] * pb.distance_matrix.iloc[arc[0], arc[1]]
-        for arc in arcs.values()
-        if arc[0] != arc[1]
+    # The PL must visit Carrefour En Jacca on Wednesday
+    # He must only do one pickup
+    carrefour_en_jacca_index = pb.n_centres + 6
+    model.add(vars.visits[2, 0, 0, carrefour_en_jacca_index] == 1)
+    model.add_bool_and(
+        vars.visits[2, 0, 0, p].negated()
+        for p in pb.pdr_nodes
+        if p != carrefour_en_jacca_index
     )
 
-    used = {v: model.NewBoolVar("") for v in allowed_vehicles}
+    # A camion Frigo must visit Carrefour la menude on Wednesday and Friday
+    # To simplify we say it only does one pickup (in reality he delivers a centre afterwards)
+    carrefour_menude_index = pb.n_centres + 5
+    model.add(vars.visits[2, 6, 0, carrefour_menude_index] == 1)
+    model.add_bool_and(
+        vars.visits[2, 6, 0, p].negated()
+        for p in range(pb.n_centres, pb.n_centres + pb.n_pdr)
+        if p != carrefour_menude_index
+    )
+
+    model.add(vars.visits[4, 4, 0, carrefour_menude_index] == 1)
+    model.add_bool_and(
+        vars.visits[4, 4, 0, p].negated()
+        for p in range(pb.n_centres, pb.n_centres + pb.n_pdr)
+        if p != carrefour_menude_index
+    )
+
+    # # # Redundant
+    # model.add_bool_and(
+    #     vars.visits[d, v, carrefour_en_jacca_index].negated()
+    #     for d in range(pb.n_days)
+    #     for v in range(pb.m)
+    #     if (d, v, carrefour_en_jacca_index) in vars.visits and (d, v) != (2, 0)
+    # )
+
+    # The PL cannot deliver Toulouse/Grande-Bretagne
+    index_gde_bretagne = 24
+    model.add_bool_and(
+        vars.visits[d, 0, trip, index_gde_bretagne].negated()
+        for d in range(pb.n_days)
+        for trip in range(pb.params.max_trips)
+    )
+
+    # Bessières cannot be delivered with camions frigos
+    index_bessieres = 3
+    model.add_bool_and(
+        vars.visits[d, v, trip, index_bessieres].negated()
+        for d in range(pb.n_days)
+        for v in pb.allowed_vehicles
+        for trip in range(pb.params.max_trips)
+        if ProductType.F in pb.vehicles[v].can_carry
+        and (d, v, trip, index_bessieres) in vars.visits
+    )
+
+    # St Orens must be picked up with a specific CF (the smallest one, for height limit reasons)
+    index_st_orens = pb.n_centres + 1
+    model.add_bool_and(
+        vars.visits[d, v, 0, index_st_orens].negated()
+        for d in range(pb.n_days)
+        for v in pb.allowed_vehicles
+        if v != 2
+    )
+
+    # "Livraisons de Ramasses" these deliver the food gathered in previous pickups. Only a single delivery can be done each time.
+    for d, v, trip, c in pb.livraisons_de_ramasses:
+        model.add_bool_and(
+            vars.visits[d, v, trip, c2]
+            if c2 == c
+            else vars.visits[d, v, trip, c2].negated()
+            for c2 in pb.delivered_centres
+            if (d, v, trip, c2) in vars.visits
+        )
+        for t in ProductType:
+            model.add(vars.delivers[d, v, trip, c, t] == 0)
+
+
+def add_domsym_breaking(
+    pb: Problem,
+    model,
+    vars: VarContainer,
+):
+    # Dominance breaking
+    for d, v, trip, c in vars.visits:
+        if (d, v, trip, c) in pb.livraisons_de_ramasses:
+            continue
+        if c == 0 or c >= pb.n_centres:
+            continue
+
+        # Visited -> delivery is not 0
+        model.add(
+            sum(vars.delivers[d, v, trip, c, t] for t in ProductType) > 0
+        ).only_enforce_if(vars.visits[d, v, trip, c])
+
+
+def add_objective(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
+    allowed_vehicles = pb.allowed_vehicles
+
+    vars.total_distance = sum(rd for rd in vars.route_dist.values())
+
+    vars.used = {v: model.new_bool_var("") for v in allowed_vehicles}
     for v in allowed_vehicles:
-        model.AddBoolAnd(
-            visits[d, v2, c].Not() for (d, v2, c) in visits if v2 == v
-        ).OnlyEnforceIf(used[v].Not())
-    variable_costs = (
+        model.add_bool_and(
+            vars.visits[d, v2, trip, c].negated()
+            for (d, v2, trip, c) in vars.visits
+            if v2 == v
+        ).only_enforce_if(vars.used[v].negated())
+        # model.add_bool_and(
+        #     vars.visits[d, v, trip, 0].negated()
+        #     for d in range(pb.n_days)
+        #     for trip in range(pb.params.max_trips)
+        #     if (d, v, trip, 0) in vars.visits
+        # ).only_enforce_if(vars.used[v].negated())
+
+    vars.variable_costs = (
         sum(
-            route_dist[d, v] * pb.vehicles[v].cost_per_km
+            vars.route_dist[d, v] * pb.vehicles[v].cost_per_km
             for d in range(pb.n_days)
             for v in allowed_vehicles
         )
         * 0.001
     )
 
-    fixed_costs = sum(used[v] * pb.vehicles[v].fixed_cost for v in allowed_vehicles)
+    vars.fixed_costs = sum(
+        vars.used[v] * pb.vehicles[v].fixed_cost
+        for v in allowed_vehicles  # type: ignore
+    )
 
-    total_costs = variable_costs + fixed_costs
-    if violation_cost:
-        total_costs += violation_cost * sum(violations.values())
-    model.Minimize(total_costs)
+    vars.total_costs = vars.variable_costs + vars.fixed_costs
+    model.minimize(vars.total_costs)
+
+
+def add_decision_strategies(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
+    pass
+
+
+def add_manual_pruning(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
+    pass
+    # model.add(sum(vars.used.values()) <= 9)
+    # model.add(vars.total_distance <= 2_500_000)
+
+
+def solve_vrp(
+    pb: Problem,
+    hint=None,
+    outfile=None,
+    time_limit=None,
+):
+    """Creates a CP model and solves it with cp-sat.
+    When done, re-optimizes the solution and writes it in JSON format to the specified file
+    """
+
+    print("[CP-SAT] Modeling... ", end="")
+
+    model = cp_model.CpModel()
+    vars = VarContainer()
+
+    loose = False
+
+    print("\r[CP-SAT] Creating variables...", end="")
+    create_tour_variables(pb, model, vars)
+    create_load_variables(pb, model, vars)
+    create_duration_variables(pb, model, vars)
+
+    print("\r[CP-SAT] Adding constraints 0/10        ", end="")
+    add_time_windows(pb, model, vars)
+    add_cover_constraints(pb, model, vars, loose=loose)
+    add_duration_constraints(pb, model, vars, loose=loose)
+
+    print("\r[CP-SAT] Adding constraints 3/10        ", end="")
+    add_load_constraints(pb, model, vars)
+    add_capacity_constraints(pb, model, vars)
+    # add_demand_constraints(pb, model, vars, loose=loose)
+    add_robust_demand_constraints(pb, model, vars)
+    # add_stochastic_demand_constraints(pb, model, vars, percentage=0.6)
+
+    print("\r[CP-SAT] Adding constraints 6/10        ", end="")
+
+    add_specific_requirements(pb, model, vars)
+    add_domsym_breaking(pb, model, vars)
+    add_decision_strategies(pb, model, vars)
+    add_manual_pruning(pb, model, vars)
+
+    print("\r[CP-SAT] Adding objective        ", end="")
+    add_objective(pb, model, vars)
+
+    # Add input file as a hint
+    if hint:
+        add_hint(
+            model,
+            pb,
+            vars,
+            hint,
+        )
 
     solver = cp_model.CpSolver()
-    solver.parameters.num_workers = 16
-    # solver.parameters.use_lns_only = True
-    # solver.parameters.diversify_lns_params = True
+
+    # set_current_tours(pb, model, vars)
     # solver.parameters.fix_variables_to_their_hinted_value = True
+
+    solver.parameters.num_workers = 16
+    solver.parameters.use_lns_only = True
+    # solver.parameters.diversify_lns_params = True
 
     if time_limit:
         solver.parameters.max_time_in_seconds = time_limit
-
-    print("Solving...")
+    print("\r[CP-SAT] Solving...                    ")
 
     # solver.parameters.log_search_progress = True
-    # status = solver.Solve(model)
-    status = solver.Solve(
-        model, LogPrinter(fixed_costs, variable_costs, total_distance, used)
-    )
+    # status = solver.solve(model)
+    status = solver.solve(model, LogPrinter(vars))
 
     if status not in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
         print("No solution found")
         return
 
-    if violation_cost:
-        for c in violations:
-            if solver.Value(violations[c]):
-                print("Allowed delivery days violation at centre ", c)
+    if outfile:
+        write_solution(pb, vars, solver, outfile)
 
-    if not outfile:
-        return
 
+def write_solution(
+    pb: Problem,
+    vars: VarContainer,
+    solver: cp_model.CpSolver,
+    outfile: str,
+):
     ##### Process the results and write as a json solution file
-
-    tours_flat = read_tours(pb, arcs, solver)
-    delivers = {k: solver.Value(v) for k, v in delivers.items()}
-    palettes = {k: solver.Value(v) for k, v in palettes.items()}
-    demi_palettes = {k: solver.Value(v) for k, v in demi_palettes.items()}
-    norvegiennes = {k: solver.Value(v) for k, v in norvegiennes.items()}
+    tours_flat = read_tours(pb, vars, solver)
+    delivers = {k: solver.value(v) for k, v in vars.delivers.items()}
+    palettes = {k: solver.value(v) for k, v in vars.palettes.items()}
+    demi_palettes = {k: solver.value(v) for k, v in vars.demi_palettes.items()}
+    norvegiennes = {k: solver.value(v) for k, v in vars.norvegiennes.items()}
 
     tour_duration = {
-        k: solver.Value(v) for k, v in tour_duration.items() if k in tours_flat
+        k: solver.value(v) for k, v in vars.tour_duration.items() if k in tours_flat
     }
 
     post_process(
@@ -770,41 +1026,49 @@ def solve_vrp(
 
     tours = {}
     for (d, v), tour in tours_flat.items():
+        if len(tour) <= 1:
+            continue
         t = []
+        trip = 0
         for node in tour[1:-1]:
             if node >= pb.n_centres:
                 name = pb.pdrs[node - pb.n_centres].name
             else:
                 name = pb.centres[node].name
-            stop = Stop(node, name, StopType(node >= pb.n_centres))  # type:ignore
-            if node < pb.n_centres:
+            stop = Stop(node, name, StopType(node >= pb.n_centres))
+
+            if node == 0:
+                trip += 1
+            elif node < pb.n_centres:
                 stop.delivery = (
-                    solver.Value(delivers[d, v, node, ProductType.A]),
-                    solver.Value(delivers[d, v, node, ProductType.F]),
-                    solver.Value(delivers[d, v, node, ProductType.S]),
+                    solver.value(delivers[d, v, trip, node, ProductType.A]),
+                    solver.value(delivers[d, v, trip, node, ProductType.F]),
+                    solver.value(delivers[d, v, trip, node, ProductType.S]),
                 )
                 stop.palettes = (
-                    solver.Value(palettes[d, v, node]),
-                    0.5 * solver.Value(demi_palettes[d, v, node, ProductType.F]),
-                    0.5 * solver.Value(demi_palettes[d, v, node, ProductType.S]),
+                    solver.value(palettes[d, v, trip, node]),
+                    0.5 * solver.value(demi_palettes[d, v, trip, node, ProductType.F]),
+                    0.5 * solver.value(demi_palettes[d, v, trip, node, ProductType.S]),
                 )
-                stop.norvegiennes = solver.Value(norvegiennes[d, v, node])
+
+                stop.norvegiennes = solver.value(norvegiennes[d, v, trip, node])
             t.append(stop)
         tours[d, v] = t
 
     sol = Solution(
-        pb.params.week.name,
-        solver.Value(total_costs),  # type: ignore
-        solver.Value(fixed_costs),  # type: ignore
-        solver.Value(variable_costs),  # type: ignore
-        solver.Value(total_distance),
+        pb.params.week.value,
+        solver.value(vars.total_costs),  # type: ignore
+        solver.value(vars.fixed_costs),  # type: ignore
+        solver.value(vars.variable_costs),  # type: ignore
+        solver.value(vars.total_distance),
         [
-            bool(solver.Value(used[v])) if v in allowed_vehicles else False
+            bool(solver.value(vars.used[v])) if v in pb.allowed_vehicles else False
             for v in range(pb.m)
         ],
         tours,
-        {k: solver.Value(v) for k, v in tour_duration.items() if k in tours_flat},
+        {k: solver.value(v) for k, v in tour_duration.items() if k in tours_flat},
     )
     sol.adjust_durations(pb.duration_matrix, pb.no_traffic_duration_matrix, pb.params)
 
     sol.write_as_json(outfile)
+    print_to_txt(sol, outfile.split(".json")[0] + ".txt")

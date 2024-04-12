@@ -4,35 +4,17 @@ import argparse
 import os
 
 
-def compute_scenarios(centre_files, scenario_names, time_limit=300):
-    for file, name in zip(centre_files, scenario_names):
-        for week in [1, 2]:
-            print("- - - - - Computing scenario", name, "for week", week)
-
-            outfile_name = f"solutions/scenarios/{name}_{week}.json"
-
-            problem = Problem.from_files(
-                file,
-                "data/points_de_ramasse.xlsx",
-                "data/vehicules.xlsx",
-                "data/distance_matrix.xlsx",
-                "data/traffic_duration_matrix.xlsx",
-                "data/no_traffic_duration_matrix.xlsx",
-                "data/params.json",
-                week=week,
-            )
-
-            if os.path.exists(outfile_name):
-                init_sol = Solution.read_from_json(outfile_name)
-            else:
-                init_sol = None
-
+def recompute_scenarios():
+    print("todo")
+    exit()
+    for file in os.listdir("problems"):
+        if "flex" not in file:
+            continue
+        if file.endswith(".json"):
+            problem = Problem.from_json(f"problems/{file}")
+            initsol = Solution.read_from_json(f"solutions/scenarios/{file}")
             solve_vrp(
-                problem,
-                hint=init_sol,
-                outfile=outfile_name,
-                violation_cost=None,
-                time_limit=time_limit,
+                problem, initsol, outfile=f"solutions/scenarios/{file}", time_limit=10
             )
 
 
