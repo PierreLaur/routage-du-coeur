@@ -262,6 +262,9 @@ def check_time_window_constraints(pb: Problem, sol: Solution):
             else:
                 assert d in pb.pdrs[stop.index - pb.n_centres].required_days
 
+                # No pickups outside of first trip
+                assert trip == 0
+
 
 def check_demand_constraints(pb: Problem, sol: Solution):
     demands_met = []

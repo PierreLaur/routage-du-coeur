@@ -261,7 +261,14 @@ def print_to_txt(sol: Solution, output_file_path):
                 name = stop.name
                 if stop.index == 0:
                     name = "    [Retour Dépôt]"
-                elif stop.type == StopType.Livraison:
+                elif stop.type == StopType.Ramasse:
+                    product_types = "Ramasse"
+
+                elif stop.type == StopType.Livraison and all(
+                    deliv == 0 for deliv in stop.delivery
+                ):
+                    product_types = "Liv. ramasse"
+                else:
                     for i, product_type in enumerate("AFS"):
                         deliv = stop.delivery[i]
                         if deliv > 0:
@@ -278,8 +285,6 @@ def print_to_txt(sol: Solution, output_file_path):
                         if stop.norvegiennes > 0
                         else ""
                     )
-                else:
-                    product_types = "Ramasse"
 
                 output += f"\t\t{name:40}\t{product_types}\t{palettes}\n"
 

@@ -47,3 +47,12 @@ def test_valid_solution(get_problem, solve_instance):
     if not solution:
         pytest.skip("no solution")
     check_solution(get_problem, solution)
+
+
+# @pytest.mark.parametrize("total_costs", [2000, 1500, 1000, 900, 800, 700, 600])
+# def test_solution_quality(solve_instance, total_costs):
+#     status, solution = solve_instance
+#     if not solution:
+#         pytest.skip("no solution")
+#     quality = solution.total_costs
+#     assert quality <= total_costs
