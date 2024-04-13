@@ -1,3 +1,4 @@
+from utils.plots import print_to_txt
 from utils.problem import Problem, Solution
 from models.cp_solver import solve_vrp
 import argparse
@@ -35,13 +36,16 @@ if __name__ == "__main__":
     problem = Problem.from_json(args.problem_file)
 
     if args.initsol:
-        init_sol = Solution.read_from_json(args.initsol)
+        init_sol = Solution.from_json(args.initsol)
     else:
         init_sol = None
 
-    solve_vrp(
+    status, solution = solve_vrp(
         problem,
         hint=init_sol,
-        outfile=args.outfile,
         time_limit=args.time_limit,
     )
+
+    if args.outfile and solution:
+        solution.to_json(args.outfile)
+        print_to_txt(solution, args.outfile.split(".json")[0] + ".txt")

@@ -127,6 +127,7 @@ class Params:
     max_tour_duration_with_pickup: int
     wait_at_centres: int
     wait_at_pdrs: int
+    wait_between_trips: int
     fuel_cost: float
 
     def to_dict(self):
@@ -148,6 +149,7 @@ class Params:
             d["max_tour_duration_with_pickup"],
             d["wait_at_centres"],
             d["wait_at_pdrs"],
+            d["wait_between_trips"],
             d["fuel_cost"],
         )
 
@@ -187,115 +189,10 @@ class Stop:
             stoptype,
         )
         if stoptype == StopType.Livraison:
-            stop.delivery = dict["delivery"]
-            stop.palettes = dict["palettes"]
+            stop.delivery = tuple(dict["delivery"])
+            stop.palettes = tuple(dict["palettes"])
             stop.norvegiennes = dict["norvegiennes"]
         return stop
-
-
-@dataclass
-class Solution:
-    week: int
-    total_costs: float
-    fixed_costs: float
-    variable_costs: float
-    total_distance: int
-    vehicles_used: list[bool]
-    tours: dict[tuple[int, int], list[Stop]]
-    tour_durations: dict[tuple[int, int], int]
-    tour_durations_adjusted: dict[tuple[int, int], str] | None = None
-
-    def write_as_json(self, outfile):
-        sol = {
-            "week": self.week,
-            "total_costs": round(self.total_costs, 5),
-            "fixed_costs": round(self.fixed_costs, 5),
-            "variable_costs": round(self.variable_costs, 5),
-            "total_distance": self.total_distance,
-            "vehicles_used": self.vehicles_used,
-        }
-        sol["tours"] = {
-            str(d) + ", " + str(v): [stop.to_dict() for stop in tour]
-            for (d, v), tour in self.tours.items()
-        }
-        sol["tour_durations"] = {
-            str(d) + ", " + str(v): int(td)
-            for (d, v), td in self.tour_durations.items()
-        }
-        if self.tour_durations_adjusted is not None:
-            sol["tour_durations_adjusted"] = {
-                str(d) + ", " + str(v): td
-                for (d, v), td in self.tour_durations_adjusted.items()
-            }
-
-        json.dump(sol, open(outfile, "w"))
-        print(f"Wrote solution to {outfile}")
-
-    @classmethod
-    def read_from_json(cls, file_path):
-        data = json.load(open(file_path))
-
-        def key_to_ints(key_str):
-            return (
-                int(key_str.split(", ")[0]),
-                int(key_str.split(", ")[1]),
-            )
-
-        tour_durations = {key_to_ints(k): v for k, v in data["tour_durations"].items()}
-        if "tour_durations_adjusted" in data:
-            tour_durations_adjusted = {
-                key_to_ints(k): v for k, v in data["tour_durations_adjusted"].items()
-            }
-        else:
-            tour_durations_adjusted = None
-
-        tours = {
-            key_to_ints(k): [Stop.from_dict(stop) for stop in tour]
-            for k, tour in data["tours"].items()
-        }
-
-        sol = cls(
-            data["week"],
-            data["total_costs"],
-            data["fixed_costs"],
-            data["variable_costs"],
-            data["total_distance"],
-            data["vehicles_used"],
-            tours,
-            tour_durations,
-            tour_durations_adjusted,
-        )
-        return sol
-
-    def adjust_durations(
-        self,
-        traffic_matrix: pd.DataFrame,
-        no_traffic_matrix: pd.DataFrame,
-        params: Params,
-    ):
-        if self.tour_durations_adjusted is not None:
-            return
-
-        self.tour_durations_adjusted = {}
-        for (d, v), tour in self.tours.items():
-            tour_indices = [stop.index for stop in tour]
-
-            estimated_duration = 0
-            for a, b in zip([0] + tour_indices, tour_indices + [0]):
-                if estimated_duration <= 90:
-                    estimated_duration += traffic_matrix.iloc[a, b] / 60  # type: ignore
-                else:
-                    estimated_duration += no_traffic_matrix.iloc[a, b] / 60  # type: ignore
-
-            estimated_duration += sum(
-                params.wait_at_centres * (stop.type == StopType.Livraison)
-                + params.wait_at_pdrs * (stop.type == StopType.Ramasse)
-                for stop in tour
-            )
-
-            self.tour_durations_adjusted[d, v] = (
-                f"{estimated_duration//60:.0f}h{estimated_duration%60:.0f}min"
-            )
 
 
 @dataclass
@@ -313,7 +210,25 @@ class Problem:
     livraisons_de_ramasses: set[tuple[int, int, int, int]]
     params: Params
 
-    def write_as_json(self, path):
+    def __eq__(self, other):
+        if not isinstance(other, Problem):
+            return False
+        return (
+            self.distance_matrix.equals(other.distance_matrix)
+            and self.duration_matrix.equals(other.duration_matrix)
+            and self.no_traffic_duration_matrix.equals(other.no_traffic_duration_matrix)
+            and self.n_centres == other.n_centres
+            and self.n_pdr == other.n_pdr
+            and self.m == other.m
+            and self.n_days == other.n_days
+            and self.vehicles == other.vehicles
+            and self.centres == other.centres
+            and self.pdrs == other.pdrs
+            and self.livraisons_de_ramasses == other.livraisons_de_ramasses
+            and self.params == other.params
+        )
+
+    def to_json(self, path):
         """Writes the problem to a json file"""
         dict = {
             "distance_matrix": self.distance_matrix.values.tolist(),
@@ -362,7 +277,6 @@ class Problem:
         no_traffic_duration_matrix_file,
         params_file,
         week,
-        custom_assignment=None,
     ):
         """Reads the problem from the usual input files and returns a Problem object"""
 
@@ -485,12 +399,14 @@ class Problem:
             for i in range(n_pdr)
         ]
 
+        index_arenes = 25
         index_malepere = 26
         livraisons_de_ramasses = {
             (0, 2, 0, index_malepere),
             (1, 2, 0, index_malepere),
             (2, 2, 0, index_malepere),
             (4, 2, 0, index_malepere),
+            (4, 2, 1, index_arenes),
         }
 
         params = Params(
@@ -505,6 +421,7 @@ class Problem:
             params_json["max_tour_duration_with_pickup"],
             params_json["wait_at_centres"],
             params_json["wait_at_pdrs"],
+            params_json["wait_between_trips"],
             params_json["fuel_cost"],
         )
 
@@ -548,3 +465,103 @@ class Problem:
     @property
     def used_nodes(self):
         return [0] + self.delivered_centres + list(self.pdr_nodes)
+
+
+@dataclass
+class Solution:
+    week: int
+    total_costs: float
+    fixed_costs: float
+    variable_costs: float
+    total_distance: int
+    vehicles_used: list[bool]
+    tours: dict[tuple[int, int], list[Stop]]
+    tour_durations: dict[tuple[int, int], int]
+    tour_durations_adjusted: dict[tuple[int, int], str] | None = None
+
+    def to_json(self, outfile):
+        sol = {
+            "week": self.week,
+            "total_costs": self.total_costs,
+            "fixed_costs": self.fixed_costs,
+            "variable_costs": self.variable_costs,
+            "total_distance": self.total_distance,
+            "vehicles_used": self.vehicles_used,
+        }
+        sol["tours"] = {
+            str(d) + ", " + str(v): [stop.to_dict() for stop in tour]
+            for (d, v), tour in self.tours.items()
+        }
+        sol["tour_durations"] = {
+            str(d) + ", " + str(v): int(td)
+            for (d, v), td in self.tour_durations.items()
+        }
+        if self.tour_durations_adjusted is not None:
+            sol["tour_durations_adjusted"] = {
+                str(d) + ", " + str(v): td
+                for (d, v), td in self.tour_durations_adjusted.items()
+            }
+
+        json.dump(sol, open(outfile, "w"))
+        print(f"Wrote solution to {outfile}")
+
+    @classmethod
+    def from_json(cls, file_path):
+        data = json.load(open(file_path))
+
+        def key_to_ints(key_str: str):
+            return (
+                int(key_str.split(", ")[0]),
+                int(key_str.split(", ")[1]),
+            )
+
+        tour_durations = {key_to_ints(k): v for k, v in data["tour_durations"].items()}
+        if "tour_durations_adjusted" in data:
+            tour_durations_adjusted = {
+                key_to_ints(k): v for k, v in data["tour_durations_adjusted"].items()
+            }
+        else:
+            tour_durations_adjusted = None
+
+        tours = {
+            key_to_ints(k): [Stop.from_dict(stop) for stop in tour]
+            for k, tour in data["tours"].items()
+        }
+
+        sol = cls(
+            data["week"],
+            data["total_costs"],
+            data["fixed_costs"],
+            data["variable_costs"],
+            data["total_distance"],
+            data["vehicles_used"],
+            tours,
+            tour_durations,
+            tour_durations_adjusted,
+        )
+        return sol
+
+    def adjust_durations(self, pb: Problem):
+        if self.tour_durations_adjusted is not None:
+            return
+
+        self.tour_durations_adjusted = {}
+        for (d, v), tour in self.tours.items():
+            tour_indices = [stop.index for stop in tour]
+
+            estimated_duration = 0
+            for a, b in zip([0] + tour_indices, tour_indices + [0]):
+                if estimated_duration <= 90:
+                    estimated_duration += pb.duration_matrix.iloc[a, b] / 60  # type: ignore
+                else:
+                    estimated_duration += pb.no_traffic_duration_matrix.iloc[a, b] / 60  # type: ignore
+
+            estimated_duration += sum(
+                pb.params.wait_at_centres * (stop.type == StopType.Livraison)
+                + pb.params.wait_at_pdrs * (stop.type == StopType.Ramasse)
+                for stop in tour
+            )
+
+            self.tour_durations_adjusted[d, v] = (
+                f"{estimated_duration//60:.0f}h{estimated_duration%60:.0f}min"
+            )

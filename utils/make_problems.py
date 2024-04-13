@@ -4,7 +4,7 @@ import os
 from itertools import combinations
 
 
-def make_problem(demand_files, allowed_days_file, week_assignments_file, week, outfile):
+def make_problem(demand_files, allowed_days_file, week_assignments_file, week):
     problem = Problem.from_files(
         demand_files,
         allowed_days_file,
@@ -17,8 +17,7 @@ def make_problem(demand_files, allowed_days_file, week_assignments_file, week, o
         "data/params.json",
         week,
     )
-
-    problem.write_as_json(outfile)
+    return problem
 
 
 def make_all(n_scenarios):
@@ -43,13 +42,13 @@ def make_all(n_scenarios):
                 for week in range(2):
                     outfile = f"problems/{n_scenarios}s_{i+1}{j+1}{k+1}_w{week+1}.json"
                     print("Making problem", outfile)
-                    make_problem(
+                    problem = make_problem(
                         files,
                         os.path.join(allowed_days_root, allowed_days_file),
                         os.path.join(week_assignments_root, week_assignments_file),
                         week,
-                        outfile,
                     )
+                    problem.to_json(outfile)
 
 
 if __name__ == "__main__":

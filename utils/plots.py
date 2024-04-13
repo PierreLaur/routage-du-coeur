@@ -412,7 +412,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     file_name = args.infile.split(".")[0]
-    sol = Solution.read_from_json(args.infile)
+    sol = Solution.from_json(args.infile)
 
     if args.txt:
         print_to_txt(sol, file_name + ".txt")

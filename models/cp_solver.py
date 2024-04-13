@@ -2,7 +2,6 @@ import json
 from ortools.sat.python import cp_model
 from math import inf, ceil
 from utils.problem import Problem, Solution, DeliveryWeek, ProductType, Stop, StopType
-from utils.plots import print_to_txt
 from typing import Any
 import numpy as np
 
@@ -63,7 +62,7 @@ class VarContainer:
 
 def add_hint(
     model: cp_model.CpModel,
-    problem: Problem,
+    pb: Problem,
     vars: VarContainer,
     init_sol: Solution,
 ) -> None:
@@ -71,104 +70,82 @@ def add_hint(
     Adds an initial solution as a hint to the model.
     """
 
-    print("TODO")
-    exit()
-
-    # Iterate over each day and vehicle
-    for day in range(problem.n_days):
-        for vehicle in range(problem.m):
-            # Ignore unused vehicles
-            if not problem.vehicles[vehicle].allowed:
+    for d in range(pb.n_days):
+        for v in range(pb.m):
+            if not pb.vehicles[v].allowed:
                 continue
 
-            # If the hint for the current day and vehicle is missing or empty, hint the solver to not use the vehicle on this day
-            if (day, vehicle) not in init_sol.tours:
-                for trip in range(problem.params.max_trips):
-                    model.add_hint(vars.visits[day, vehicle, trip, 0], 0)
+            if (d, v) not in init_sol.tours:
+                for trip in range(pb.params.max_trips):
+                    model.add_hint(vars.visits[d, v, trip, 0], 0)
                 continue
 
             trip = 0
-
-            # Create a set of arcs to be assigned
             to_assign = set(
                 (trip, start, end)
-                for trip in range(problem.params.max_trips)
-                for start in range(problem.n_centres + problem.n_pdr)
-                for end in range(problem.n_centres + problem.n_pdr)
-                if start != end and (day, vehicle, start, end) in vars.arcs
+                for trip in range(pb.params.max_trips)
+                for start in range(pb.n_centres + pb.n_pdr)
+                for end in range(pb.n_centres + pb.n_pdr)
+                if start != end
             )
 
-            # hint the solver to use this vehicle on this day (at least the first trip)
-            if (day, vehicle, 0, 0) in vars.visits:
-                model.add_hint(vars.visits[day, vehicle, 0, 0], 1)
+            if (d, v, 0, 0) in vars.visits:
+                model.add_hint(vars.visits[d, v, 0, 0], 1)
 
-            current_location = 0
+            a = 0
+            trip = 0
 
-            # Iterate over each place in the hint tour
-            tour = init_sol.tours[day, vehicle]
+            tour = init_sol.tours[d, v]
             for stop in tour:
-                next_location = stop.index
+                b = stop.index
+                model.add_hint(vars.arcs[d, v, trip][a, b], 1)
+                to_assign.remove((trip, a, b))
+                a = b
+                if b == 0:
+                    trip += 1
+                    continue
 
-                # Set the hint for the arc from the current location to the next location
-                if (day, vehicle, current_location, next_location) in vars.arcs:
-                    model.add_hint(
-                        vars.arcs[day, vehicle][current_location, next_location], 1
-                    )
-                    to_assign.remove((current_location, next_location))
-                current_location = next_location
-
-                # Set the hints for the quantities to be delivered at the next location
                 if (
-                    next_location < problem.n_centres
-                    and (day, vehicle, next_location) in vars.palettes
-                    and problem.centres[next_location].delivery_week
-                    in [DeliveryWeek.ANY, problem.params.week]
+                    b < pb.n_centres
+                    and (d, v, trip, b) in vars.palettes
+                    and pb.centres[b].delivery_week
+                    in [DeliveryWeek.ANY, pb.params.week]
                 ):
                     for product_type in ProductType:
-                        if product_type in problem.vehicles[vehicle].can_carry:
+                        if product_type in pb.vehicles[v].can_carry:
                             model.add_hint(
-                                vars.delivers[
-                                    day, vehicle, next_location, product_type
-                                ],
+                                vars.delivers[d, v, trip, b, product_type],
                                 stop.delivery[product_type.value],
                             )
 
-                    if ProductType.A in problem.vehicles[vehicle].can_carry:
+                    if ProductType.A in pb.vehicles[v].can_carry:
                         model.add_hint(
-                            vars.palettes[day, vehicle, next_location],
+                            vars.palettes[d, v, trip, b],
                             ceil(stop.palettes[0]),
                         )
 
-                    if ProductType.F in problem.vehicles[vehicle].can_carry:
+                    if ProductType.F in pb.vehicles[v].can_carry:
                         model.add_hint(
-                            vars.demi_palettes[
-                                day, vehicle, next_location, ProductType.F
-                            ],
+                            vars.demi_palettes[d, v, trip, b, ProductType.F],
                             round(stop.palettes[1] * 2),
                         )
 
-                    if ProductType.S in problem.vehicles[vehicle].can_carry:
+                    if ProductType.S in pb.vehicles[v].can_carry:
                         model.add_hint(
-                            vars.norvegiennes[day, vehicle, next_location],
+                            vars.norvegiennes[d, v, trip, b],
                             stop.norvegiennes,
                         )
-                        if problem.vehicles[vehicle].allows_isotherm_cover:
+                        if pb.vehicles[v].allows_isotherm_cover:
                             model.add_hint(
-                                vars.demi_palettes[
-                                    day, vehicle, next_location, ProductType.S
-                                ],
+                                vars.demi_palettes[d, v, trip, b, ProductType.S],
                                 round(stop.palettes[2] * 2),
                             )
 
-            # Set the hint for the arc from the current location back to the depot
-            if (day, vehicle, current_location, 0) in vars.arcs:
-                model.add_hint(vars.arcs[day, vehicle][current_location, 0], 1)
-                to_assign.remove((current_location, 0))
+            model.add_hint(vars.arcs[d, v, trip][a, 0], 1)
+            to_assign.remove((trip, a, 0))
 
-            # Hint to not use any remaining arcs
-            for start, end in to_assign:
-                if (day, vehicle, start, end) in vars.arcs:
-                    model.add_hint(vars.arcs[day, vehicle][start, end], 0)
+            # for trip, start, end in to_assign:
+            #     model.add_hint(vars.arcs[d, v, trip][start, end], 0)
 
 
 def set_current_tours(
@@ -267,9 +244,6 @@ def post_process(
     """Shaves any superfluous decisions (useless norvegiennes/palettes) from the solution
     Also adds the time required to come back to the depot to the tour duration"""
 
-    print("TODO: post process")
-    return
-
     for (d, v), tour in tours.items():
         # Remove any useless norvegiennes and demi palettes for s products
         for c in tour:
@@ -335,6 +309,75 @@ def post_process(
                 palettes[d, v, c] = new_n_palettes
 
 
+def make_solution(pb: Problem, vars: VarContainer, solver: cp_model.CpSolver):
+    tours_flat = read_tours(pb, vars, solver)
+    delivers = {k: solver.value(v) for k, v in vars.delivers.items()}
+    palettes = {k: solver.value(v) for k, v in vars.palettes.items()}
+    demi_palettes = {k: solver.value(v) for k, v in vars.demi_palettes.items()}
+    norvegiennes = {k: solver.value(v) for k, v in vars.norvegiennes.items()}
+
+    tour_duration = {
+        k: solver.value(v) for k, v in vars.tour_duration.items() if k in tours_flat
+    }
+
+    post_process(
+        pb,
+        tours_flat,
+        delivers,
+        palettes,
+        demi_palettes,
+        norvegiennes,
+        tour_duration,
+    )
+
+    tours = {}
+    for (d, v), tour in tours_flat.items():
+        if len(tour) <= 1:
+            continue
+        t = []
+        trip = 0
+        for node in tour[1:-1]:
+            if node >= pb.n_centres:
+                name = pb.pdrs[node - pb.n_centres].name
+            else:
+                name = pb.centres[node].name
+            stop = Stop(node, name, StopType(node >= pb.n_centres))
+
+            if node == 0:
+                trip += 1
+            elif node < pb.n_centres:
+                stop.delivery = (
+                    solver.value(delivers[d, v, trip, node, ProductType.A]),
+                    solver.value(delivers[d, v, trip, node, ProductType.F]),
+                    solver.value(delivers[d, v, trip, node, ProductType.S]),
+                )
+                stop.palettes = (
+                    solver.value(palettes[d, v, trip, node]),
+                    0.5 * solver.value(demi_palettes[d, v, trip, node, ProductType.F]),
+                    0.5 * solver.value(demi_palettes[d, v, trip, node, ProductType.S]),
+                )
+
+                stop.norvegiennes = solver.value(norvegiennes[d, v, trip, node])
+            t.append(stop)
+        tours[d, v] = t
+
+    sol = Solution(
+        pb.params.week.value,
+        round(solver.value(vars.total_costs), 3),  # type: ignore
+        round(solver.value(vars.fixed_costs), 3),  # type: ignore
+        round(solver.value(vars.variable_costs), 3),  # type: ignore
+        solver.value(vars.total_distance),
+        [
+            bool(solver.value(vars.used[v])) if v in pb.allowed_vehicles else False
+            for v in range(pb.m)
+        ],
+        tours,
+        {k: solver.value(v) for k, v in tour_duration.items() if k in tours_flat},
+    )
+    sol.adjust_durations(pb)
+    return sol
+
+
 def create_tour_variables(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
     """Creates arcs and visits variables and loads them into the VarContainer and the model"""
     n_nodes = pb.n_nodes
@@ -345,6 +388,8 @@ def create_tour_variables(pb: Problem, model: cp_model.CpModel, vars: VarContain
     pruned = prune_arcs(n_nodes, pb.distance_matrix, limit=1)
     if pruned:
         print(f"    Pruned arcs : {100*len(pruned)/(n_nodes)**2:.2f}%")
+
+    vars.used = {v: model.new_bool_var("") for v in allowed_vehicles}
 
     ########## Arcs & Visit variables ###########
     for d in range(pb.n_days):
@@ -474,7 +519,7 @@ def create_duration_variables(pb: Problem, model: cp_model.CpModel, vars: VarCon
             vars.tour_duration[d, v] = sum(
                 vars.trip_duration[d, v, trip] for trip in range(pb.params.max_trips)
             ) + sum(
-                vars.visits[d, v, trip, 0] * pb.params.wait_at_centres * 60
+                vars.visits[d, v, trip, 0] * pb.params.wait_between_trips * 60
                 for trip in range(1, pb.params.max_trips)  # type: ignore
             )
 
@@ -586,11 +631,11 @@ def add_cover_constraints(pb: Problem, model, vars: VarContainer, loose: bool = 
         else:
             min_visits = 1
 
-        # Heuristic pruning rule (very effective)
+        # # Heuristic pruning rule (very effective)
         max_visits = ceil(max_sum_demands / pb.params.max_palette_capacity)
 
-        # more than 4 visits is unreasonable in practice
-        max_visits = min(max_visits, 4)
+        # more than 3 visits is unreasonable in practice
+        max_visits = min(max_visits, 3)
 
         if loose:
             # needed for the current tours to satisfy this constraint
@@ -615,7 +660,7 @@ def add_cover_constraints(pb: Problem, model, vars: VarContainer, loose: bool = 
                 for v in pb.allowed_vehicles
                 for trip in range(pb.params.max_trips)
                 if d in pb.centres[c].allowed_days
-                and (d, v, c) not in pb.livraisons_de_ramasses
+                and (d, v, trip, c) not in pb.livraisons_de_ramasses
             ),
             min_visits,
             max_visits,
@@ -754,7 +799,7 @@ def add_duration_constraints(
             pickups = model.new_bool_var("")
             model.add_bool_and(
                 vars.visits[d, v, 0, p].negated() for p in pdr_nodes
-            ).only_enforce_if(pickups)
+            ).only_enforce_if(pickups.negated())
             model.add(
                 vars.trip_duration[d, v, 0]
                 <= pb.params.max_tour_duration_with_pickup * 60
@@ -877,7 +922,6 @@ def add_objective(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
 
     vars.total_distance = sum(rd for rd in vars.route_dist.values())
 
-    vars.used = {v: model.new_bool_var("") for v in allowed_vehicles}
     for v in allowed_vehicles:
         model.add_bool_and(
             vars.visits[d, v2, trip, c].negated()
@@ -910,20 +954,21 @@ def add_objective(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
 
 
 def add_decision_strategies(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
-    pass
+    return
 
 
 def add_manual_pruning(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
-    pass
-    # model.add(sum(vars.used.values()) <= 9)
-    # model.add(vars.total_distance <= 2_500_000)
+    model.add(sum(vars.used.values()) <= 8)
+    model.add(vars.total_distance <= 2_500_000)
+    return
 
 
 def solve_vrp(
     pb: Problem,
     hint=None,
-    outfile=None,
     time_limit=None,
+    stop_at_first_solution=False,
+    fix_hint=False,
 ):
     """Creates a CP model and solves it with cp-sat.
     When done, re-optimizes the solution and writes it in JSON format to the specified file
@@ -958,10 +1003,10 @@ def solve_vrp(
     add_specific_requirements(pb, model, vars)
     add_domsym_breaking(pb, model, vars)
     add_decision_strategies(pb, model, vars)
-    add_manual_pruning(pb, model, vars)
 
     print("\r[CP-SAT] Adding objective        ", end="")
     add_objective(pb, model, vars)
+    add_manual_pruning(pb, model, vars)
 
     # Add input file as a hint
     if hint:
@@ -975,7 +1020,8 @@ def solve_vrp(
     solver = cp_model.CpSolver()
 
     # set_current_tours(pb, model, vars)
-    # solver.parameters.fix_variables_to_their_hinted_value = True
+    if hint and fix_hint:
+        solver.parameters.fix_variables_to_their_hinted_value = True
 
     solver.parameters.num_workers = 16
     solver.parameters.use_lns_only = True
@@ -983,6 +1029,9 @@ def solve_vrp(
 
     if time_limit:
         solver.parameters.max_time_in_seconds = time_limit
+    if stop_at_first_solution:
+        solver.parameters.stop_after_first_solution = True
+
     print("\r[CP-SAT] Solving...                    ")
 
     # solver.parameters.log_search_progress = True
@@ -991,84 +1040,7 @@ def solve_vrp(
 
     if status not in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
         print("No solution found")
-        return
-
-    if outfile:
-        write_solution(pb, vars, solver, outfile)
-
-
-def write_solution(
-    pb: Problem,
-    vars: VarContainer,
-    solver: cp_model.CpSolver,
-    outfile: str,
-):
-    ##### Process the results and write as a json solution file
-    tours_flat = read_tours(pb, vars, solver)
-    delivers = {k: solver.value(v) for k, v in vars.delivers.items()}
-    palettes = {k: solver.value(v) for k, v in vars.palettes.items()}
-    demi_palettes = {k: solver.value(v) for k, v in vars.demi_palettes.items()}
-    norvegiennes = {k: solver.value(v) for k, v in vars.norvegiennes.items()}
-
-    tour_duration = {
-        k: solver.value(v) for k, v in vars.tour_duration.items() if k in tours_flat
-    }
-
-    post_process(
-        pb,
-        tours_flat,
-        delivers,
-        palettes,
-        demi_palettes,
-        norvegiennes,
-        tour_duration,
-    )
-
-    tours = {}
-    for (d, v), tour in tours_flat.items():
-        if len(tour) <= 1:
-            continue
-        t = []
-        trip = 0
-        for node in tour[1:-1]:
-            if node >= pb.n_centres:
-                name = pb.pdrs[node - pb.n_centres].name
-            else:
-                name = pb.centres[node].name
-            stop = Stop(node, name, StopType(node >= pb.n_centres))
-
-            if node == 0:
-                trip += 1
-            elif node < pb.n_centres:
-                stop.delivery = (
-                    solver.value(delivers[d, v, trip, node, ProductType.A]),
-                    solver.value(delivers[d, v, trip, node, ProductType.F]),
-                    solver.value(delivers[d, v, trip, node, ProductType.S]),
-                )
-                stop.palettes = (
-                    solver.value(palettes[d, v, trip, node]),
-                    0.5 * solver.value(demi_palettes[d, v, trip, node, ProductType.F]),
-                    0.5 * solver.value(demi_palettes[d, v, trip, node, ProductType.S]),
-                )
-
-                stop.norvegiennes = solver.value(norvegiennes[d, v, trip, node])
-            t.append(stop)
-        tours[d, v] = t
-
-    sol = Solution(
-        pb.params.week.value,
-        solver.value(vars.total_costs),  # type: ignore
-        solver.value(vars.fixed_costs),  # type: ignore
-        solver.value(vars.variable_costs),  # type: ignore
-        solver.value(vars.total_distance),
-        [
-            bool(solver.value(vars.used[v])) if v in pb.allowed_vehicles else False
-            for v in range(pb.m)
-        ],
-        tours,
-        {k: solver.value(v) for k, v in tour_duration.items() if k in tours_flat},
-    )
-    sol.adjust_durations(pb.duration_matrix, pb.no_traffic_duration_matrix, pb.params)
-
-    sol.write_as_json(outfile)
-    print_to_txt(sol, outfile.split(".json")[0] + ".txt")
+        return status, None
+    else:
+        sol = make_solution(pb, vars, solver)
+        return status, sol

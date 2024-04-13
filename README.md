@@ -13,16 +13,17 @@ options :
 - ```--outfile <output file path>``` (write the solution to a specified json file)
 - ```--time_limit, -t <int>``` (time limit in seconds)
 
-```problem.py``` defines useful data structures, including dataclasses for problem instances (variations and scenarios) and for solutions, both of which can be written to JSON  
+Check a solution file :  
+```python -m utils.tests <problem file> <solution file>```
 
 Create all possible JSON problem files from combinations of demands, week assignments and allowed days in problems/ subdirectories, using parameters in data/params.json, with the given number of scenarios :  
 ```python -m utils.make_problems  <n_scenarios>```
 
-```tests.py``` defines a solution checking procedure. set the test instances in the test_instances variable and run ```pytest utils/tests.py``` to solve with time_limit=10 and check the resulting solutions.  
-Run ```python -m utils.tests <problem> <solution>``` to test a specific problem and solution file.
-
-Print the solution as txt file/html map/dashboard :  
+Print a solution as txt file/html map/dashboard :  
 ```python -m utils.plots <solution file> <-t> <-m> <-d>```
+
+Run tests :  
+```pytest```
 
 [Example Solution](solutions/example.txt)  
 [Example map](solutions/example.html)  

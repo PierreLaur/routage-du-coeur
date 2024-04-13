@@ -1,10 +1,6 @@
 import argparse
 from utils.problem import Problem, Solution, ProductType, DeliveryWeek, StopType, Stop
-from models.cp_solver import solve_vrp
 from numpy import int64
-import pytest
-from os import remove
-import subprocess
 
 
 def get_trips(tour: list[Stop]):
@@ -70,7 +66,7 @@ def check_durations(pb: Problem, sol: Solution):
                     )
 
             if i < len(trips) - 1:
-                tour_duration += pb.params.wait_at_centres
+                tour_duration += pb.params.wait_between_trips
 
         assert tour_duration <= pb.params.max_tour_duration
 
@@ -179,12 +175,11 @@ def check_capacity_constraints(pb: Problem, sol: Solution):
 
 
 def check_specific_requirements(pb: Problem, sol: Solution):
-    # Specific requirements
+    ### Carrefour centrale must be visited by these vehicles on these days
     assert (2, 0) in sol.tours
     assert (2, 6) in sol.tours
     assert (4, 4) in sol.tours
 
-    ### Carrefour centrale must be visited by these vehicles on these days
     assert "CARREFOUR EN JACCA" in [node.name for node in sol.tours[2, 0]]
     assert "CARREFOUR LA MENUDE" in [node.name for node in sol.tours[2, 6]]
     assert "CARREFOUR LA MENUDE" in [node.name for node in sol.tours[4, 4]]
@@ -294,54 +289,13 @@ def check_demand_constraints(pb: Problem, sol: Solution):
     print(f"[TEST] Demands met in {sum(demands_met)}/{len(demands_met)} scenarios")
 
 
-def check_solution_file(
-    problem_file,
-    solution_file,
-):
-    """Checks whether a solution file satisfies all constraints specified in a problem file"""
-
-    sol = Solution.read_from_json(solution_file)
-    pb = Problem.from_json(problem_file)
-
+def check_solution(pb: Problem, sol: Solution):
     check_durations(pb, sol)
     check_load_constraints(pb, sol)
     check_capacity_constraints(pb, sol)
     check_specific_requirements(pb, sol)
     check_time_window_constraints(pb, sol)
     check_demand_constraints(pb, sol)
-
-    print("[TEST] No constraint violations detected - the solution is valid.")
-
-
-test_instances = []
-
-
-@pytest.mark.parametrize("instance", test_instances)
-def test_ortools(instance):
-    tmp_file = "solutions/tmp.json"
-    time_limit = 10
-    problem = Problem.from_json(instance)
-    solve_vrp(problem, outfile=tmp_file, time_limit=time_limit)
-    check_solution_file(instance, tmp_file)
-    remove(tmp_file)
-
-
-@pytest.mark.parametrize("instance", test_instances)
-def test_hexaly(instance):
-    tmp_file = "solutions/tmp.json"
-    time_limit = 10
-    subprocess.run(
-        [
-            "localsolver",
-            "models/ls_solver.lsp",
-            instance,
-            "nil",
-            tmp_file,
-            str(time_limit),
-        ]
-    )
-    check_solution_file(instance, tmp_file)
-    remove(tmp_file)
 
 
 if __name__ == "__main__":
@@ -350,4 +304,7 @@ if __name__ == "__main__":
     parser.add_argument("solution")
 
     args = parser.parse_args()
-    check_solution_file(args.instance, args.solution)
+    pb = Problem.from_json(args.instance)
+    sol = Solution.from_json(args.solution)
+    check_solution(pb, sol)
+    print("[TEST] No constraint violations detected - the solution is valid.")
