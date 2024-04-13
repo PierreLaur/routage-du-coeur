@@ -24,7 +24,11 @@ def solve_instance(request):
             f"{time_limit}",
         ]
     )
-    return request.param, tmp_file
+    yield request.param, tmp_file
+    try:
+        os.remove(tmp_file)
+    except OSError:
+        pass
 
 
 def test_finds_feasible(solve_instance):
