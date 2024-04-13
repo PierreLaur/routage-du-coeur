@@ -618,7 +618,7 @@ def add_time_windows(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
                 )
 
 
-def add_cover_constraints(pb: Problem, model, vars: VarContainer, loose: bool = False):
+def add_cover_constraints(pb: Problem, model, vars: VarContainer):
     fourgon_capacity = 1200
     for c in pb.delivered_centres:
         # Redundant Cover constraint
@@ -637,22 +637,6 @@ def add_cover_constraints(pb: Problem, model, vars: VarContainer, loose: bool = 
         # more than 3 visits is unreasonable in practice
         max_visits = min(max_visits, 3)
 
-        if loose:
-            # needed for the current tours to satisfy this constraint
-            print("loose pruning")
-            if c == 22:
-                max_visits = 2
-            if c == 23:
-                max_visits = 3
-            if c == 15:
-                max_visits = 2
-            if c == 6:
-                max_visits = 2
-            if c == 7:
-                min_visits = 1
-            if c == 16:
-                max_visits = 2
-
         model.add_linear_constraint(
             sum(
                 vars.visits[d, v, trip, c]
@@ -667,21 +651,9 @@ def add_cover_constraints(pb: Problem, model, vars: VarContainer, loose: bool = 
         )
 
 
-def add_demand_constraints(
-    pb: Problem, model: cp_model.CpModel, vars: VarContainer, loose=False
-):
+def add_demand_constraints(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
     # Every customer must be served his demand
     for c in pb.delivered_centres:
-        if loose:
-            if c in [
-                10,  # Fonsorbes AFS (+ Muret FS + Portet FS) trop pour 1 seul CF
-                17,  # Pibrac : F/S trop pour 1 seul CF
-                26,  # Les Arenes : F/S trop pour 1 seul CF
-                25,  # Malepere FS + Escalquens AFS trop pour 2 CFs
-            ]:  # These centres have too much demand for the current tours
-                print("Relaxing ", pb.centres[c].name, pb.centres[c].demands)
-                continue
-
         for type in ProductType:
             model.add(
                 sum(
@@ -784,18 +756,13 @@ def add_capacity_constraints(pb: Problem, model: cp_model.CpModel, vars: VarCont
                 )
 
 
-def add_duration_constraints(
-    pb: Problem, model: cp_model.CpModel, vars: VarContainer, loose=False
-):
+def add_duration_constraints(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
     delivered_centres = pb.delivered_centres
     pdr_nodes = pb.pdr_nodes
 
     # Duration constraints
     for d in range(pb.n_days):
         for v in pb.allowed_vehicles:
-            if loose and (d, v) in [(1, 0), (1, 7), (3, 2)]:
-                continue
-
             pickups = model.new_bool_var("")
             model.add_bool_and(
                 vars.visits[d, v, 0, p].negated() for p in pdr_nodes
@@ -979,8 +946,6 @@ def solve_vrp(
     model = cp_model.CpModel()
     vars = VarContainer()
 
-    loose = False
-
     print("\r[CP-SAT] Creating variables...", end="")
     create_tour_variables(pb, model, vars)
     create_load_variables(pb, model, vars)
@@ -988,20 +953,20 @@ def solve_vrp(
 
     print("\r[CP-SAT] Adding constraints 0/10        ", end="")
     add_time_windows(pb, model, vars)
-    add_cover_constraints(pb, model, vars, loose=loose)
-    add_duration_constraints(pb, model, vars, loose=loose)
+    add_cover_constraints(pb, model, vars)
+    add_duration_constraints(pb, model, vars)
 
     print("\r[CP-SAT] Adding constraints 3/10        ", end="")
     add_load_constraints(pb, model, vars)
     add_capacity_constraints(pb, model, vars)
-    # add_demand_constraints(pb, model, vars, loose=loose)
+    # add_demand_constraints(pb, model, vars)
     add_robust_demand_constraints(pb, model, vars)
     # add_stochastic_demand_constraints(pb, model, vars, percentage=0.6)
 
     print("\r[CP-SAT] Adding constraints 6/10        ", end="")
 
     add_specific_requirements(pb, model, vars)
-    add_domsym_breaking(pb, model, vars)
+    # add_domsym_breaking(pb, model, vars)
     add_decision_strategies(pb, model, vars)
 
     print("\r[CP-SAT] Adding objective        ", end="")
@@ -1022,6 +987,7 @@ def solve_vrp(
     # set_current_tours(pb, model, vars)
     if hint and fix_hint:
         solver.parameters.fix_variables_to_their_hinted_value = True
+    # solver.parameters.fix_variables_to_their_hinted_value = True
 
     solver.parameters.num_workers = 16
     solver.parameters.use_lns_only = True

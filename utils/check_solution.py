@@ -249,10 +249,16 @@ def check_time_window_constraints(pb: Problem, sol: Solution):
     # Don't visit outside of allowed/required days
     for (d, v), tour in sol.tours.items():
         trip = 0
+        trip_used = False
         for stop in tour:
             if stop.index == 0:
+                # Make sure trips are done in order
+                assert trip_used
                 trip += 1
+                trip_used = False
                 continue
+
+            trip_used = True
 
             if stop.type == StopType.Livraison:
                 assert (

@@ -140,7 +140,6 @@ function input() {
 
 }
 
-
 function add_specific_requirements() {
     /* 
     Adds a few "hard-coded" constraints 
@@ -206,13 +205,14 @@ function add_time_windows() {
                 }
             }
             for [trip in 1...n_trips] {
-                constraint count(ramasses[d][v][trip]) == 0 ;
+                constraint !ram[d][v][trip] ;
+                constraint (liv[d][v][trip] + ram[d][v][trip] == 0) || (liv[d][v][trip-1] + ram[d][v][trip-1] >= 1) ;
             }
-            for [p in 0...n_pdr] {
-                if (!pickup_d_p[d][p] || !can_carry[v][pdrs[p]["product_type"]]) {
-                    constraint !visits_r[d][v][trip][p] ;
-                }
-            }
+            // for [p in 0...n_pdr] {
+            //     if (!pickup_d_p[d][p] || !can_carry[v][pdrs[p]["product_type"]]) {
+            //         constraint !visits_r[d][v][trip][p] ;
+            //     }
+            // }
         }
     }
 }
@@ -223,11 +223,14 @@ function add_capacity_constraints() {
         for [v in allowed_vehicles] {
             for [trip in 0...n_trips] {
                 // Delivery capacity & size constraints
-                constraint sum[c in 0...n : delivery_allowed[d][c]](palettes[d][v][trip][c] + 0.5 * (demi_palettes[d][v][trip][c]["F"] + demi_palettes[d][v][trip][c]["S"])) <= vehicles[v]["size"] ;
+                constraint sum[c in 0...n : delivery_allowed[d][c]]
+                    (palettes[d][v][trip][c] + 0.5 * (demi_palettes[d][v][trip][c]["F"] + demi_palettes[d][v][trip][c]["S"])) <= vehicles[v]["size"] ;
+
                 constraint sum[c in 0...n : delivery_allowed[d][c]](load[d][v][trip][c]) <= vehicles[v]["capacity"] ;
 
                 // Pickup capacity & size constraints
                 constraint sum[p in 0...n_pdr : pickup_d_p[d][p]](pdrs[p]["weight"] * visits_r[d][v][trip][p]) <= vehicles[v]["capacity"];
+                
                 // We assume 2 palettes are used for each pickup
                 constraint sum[p in 0...n_pdr : pickup_d_p[d][p]](2 * visits_r[d][v][trip][p]) <= vehicles[v]["size"] ;
             }
@@ -271,7 +274,8 @@ function add_duration_constraints() {
                 constraint n_livraisons[d][v][trip] + n_ramasses[d][v][trip] <= params["max_stops"] ;
             }
             constraint ram[d][v][0] ? (trip_duration[d][v][0] <= params["max_tour_duration_with_pickup"] * 60) : true; 
-            tour_duration[d][v] <- sum[trip in 0...n_trips](trip_duration[d][v][trip]);
+            tour_duration[d][v] <- sum[trip in 0...n_trips](trip_duration[d][v][trip])
+                                + sum[trip in 1...n_trips](liv[d][v][trip]) * params["wait_between_trips"] * 60;
             constraint tour_duration[d][v] <= params["max_tour_duration"] * 60;
         }
     }
@@ -297,14 +301,14 @@ function create_variables() {
                         }
 
                         no_delivery = is_ldr[d][v][trip][c] || !delivery_allowed[d][c] || !can_carry[v][t];
-
                         quantity[d][v][trip][c][t] <-
                                 no_delivery ? 
                                 0 :int(0, max_demands) ;
                     }
                 }
 
-                norvegiennes[d][v][trip][c in 0...n] <- !is_ldr[d][v][trip][c] && delivery_allowed[d][c] && can_carry[v]["S"] ? int(0, params["n_norvegiennes"]) : 0;
+                norvegiennes[d][v][trip][c in 0...n] <- !is_ldr[d][v][trip][c] && delivery_allowed[d][c] && can_carry[v]["S"] ? 
+                    int(0, params["n_norvegiennes"]) : 0;
 
                 n_livraisons[d][v][trip] <- count(livraisons[d][v][trip]) ;
                 n_ramasses[d][v][trip] <- count(ramasses[d][v][trip]) ;
@@ -320,7 +324,7 @@ function create_variables() {
                     load[d][v][trip][c] <- visits_l[d][v][trip][c] * sum[t in product_types](quantity[d][v][trip][c][t]);
 
                     palettes[d][v][trip][c] <- ceil(visits_l[d][v][trip][c] * quantity[d][v][trip][c]["A"] / params["max_palette_capacity"]) ;
-                    demi_palettes[d][v][trip][c]["F"] <- 2 * ceil(visits_l[d][v][trip][c] * quantity[d][v][trip][c]["F"] / params["demi_palette_capacity"]);
+                    demi_palettes[d][v][trip][c]["F"] <- ceil(2 * visits_l[d][v][trip][c] * quantity[d][v][trip][c]["F"] / params["demi_palette_capacity"]);
                     demi_palettes[d][v][trip][c]["S"] <- delivery_allowed[d][c] && can_carry[v]["S"] && vehicles[v]["allows_isotherm_cover"] ?
                                             max(0, ceil(
                                                 (visits_l[d][v][trip][c] * quantity[d][v][trip][c]["S"] - 
@@ -346,34 +350,28 @@ function add_cover_constraints() {
     for [p in 0...n_pdr] {
         for [d in 0...n_days] {
             if (pickup_d_p[d][p]) {
-                constraint xor[v in allowed_vehicles][trip in 0...n_trips](visits_r[d][v][trip][p]) ;
-                // constraint or[v in allowed_vehicles : can_carry[v][pdrs[p]["product_type"]]](visits_r[d][v][trip][p]) ;
+                constraint xor[v in allowed_vehicles : can_carry[v][pdrs[p]["product_type"]]][trip in 0...n_trips](visits_r[d][v][trip][p]) ;
+                // constraint or[v in allowed_vehicles : can_carry[v][pdrs[p]["product_type"]]][trip in 0...n_trips](visits_r[d][v][trip][p]) ;
             } else {
-                // constraint and[v in allowed_vehicles](visits_r[d][v][trip][p] == 0) ;
+                constraint and[v in allowed_vehicles][trip in 0...n_trips](visits_r[d][v][trip][p] == 0) ;
             }
         }
     }
 
     // Redundant
     for [d in 0...n_days] {
-        // constraint disjoint[v in allowed_vehicles](ramasses[d][v][trip]) ;
-        for [p in 0...n_pdr : pickup_d_p[d][p]] {
-            constraint sum[v in allowed_vehicles : can_carry[v][pdrs[p]["product_type"]]][trip in 0...n_trips](visits_r[d][v][trip][p]) == 1 ;
-        }
+        constraint disjoint[v in allowed_vehicles][trip in 0...n_trips](ramasses[d][v][trip]) ;
+        // for [p in 0...n_pdr : pickup_d_p[d][p]] {
+        //     constraint sum[v in allowed_vehicles : can_carry[v][pdrs[p]["product_type"]]][trip in 0...n_trips](visits_r[d][v][trip][p]) == 1 ;
+        // }
     }
 
-    // Don't visit the same centre more than 4 times
+    // Don't visit the same centre more than 3 times
     for [c in 0...n] {
         constraint sum[d in 0...n_days : delivery_allowed[d][c]]
                     [v in allowed_vehicles : !is_ldr[d][v][trip][c]]
                     [trip in 0...n_trips]
-            (visits_l[d][v][trip][c]) <= 4 ;
-        
-        // // redundant
-        // if (sum[t in product_types](demands[c][t]) > 1200) {
-        //     constraint sum[d in 0...n_days : delivery_allowed[d][c]][v in allowed_vehicles : !is_ldr[d][v][trip][c]]
-        //         (visits_l[d][v][trip][c]) >= 2 ;
-        // }
+            (visits_l[d][v][trip][c]) <= 3 ;
     }
 
 }
@@ -452,23 +450,34 @@ function set_initial_solution(force, specific_vd) {
 
             key = d + ", " + v;
 
+            if (!force) {
+                livraisons[d][v][trip].value.clear();
+                ramasses[d][v][trip].value.clear();
+            }
+
             if (tours_init[key] == nil) {
-                if (force) {
-                    constraint n_livraisons[d][v] == 0 ;
-                    constraint n_ramasses[d][v] == 0 ;
+                for [trip in 0...n_trips] {
+                    if (force) {
+                        constraint n_livraisons[d][v][trip] == 0 ;
+                        constraint n_ramasses[d][v][trip] == 0 ;
+                    }
                 }
                 continue;
             }
-
             livraison_init = {};
             ramasse_init = {};
-            if (!force) {
-                livraisons[d][v].value.clear();
-                ramasses[d][v].value.clear();
-            }
+            trip = 0;
             i = 0;
             j = 0 ;
             for [place in tours_init[key]] {
+                if (place["index"] == 0) {
+                    trip += 1 ;
+                    i = 0 ;
+                    livraison_init = {};
+                    ramasse_init = {};
+                    continue;
+                }
+
                 if (place["type"] == "Livraison") {
                     index = -1 ;
                     for [c in 0...n] {
@@ -484,44 +493,48 @@ function set_initial_solution(force, specific_vd) {
 
                     livraison_init.add(index);
                     if (force) {
-                        constraint livraisons[d][v][i] == index;
+                        constraint livraisons[d][v][trip][i] == index;
                         i += 1 ;
-                        constraint visits_l[d][v][index] == 1 ;
-                        constraint norvegiennes[d][v][index] == place["norvegiennes"];
-                        constraint quantity[d][v][index]["A"] == place["delivery"][0] ;
-                        constraint quantity[d][v][index]["F"] == place["delivery"][1] ;
-                        constraint quantity[d][v][index]["S"] == place["delivery"][2] ;
+                        constraint visits_l[d][v][trip][index] == 1 ;
+                        constraint norvegiennes[d][v][trip][index] == place["norvegiennes"];
+                        constraint quantity[d][v][trip][index]["A"] == place["delivery"][0] ;
+                        constraint quantity[d][v][trip][index]["F"] == place["delivery"][1] ;
+                        constraint quantity[d][v][trip][index]["S"] == place["delivery"][2] ;
                     } else {
-                        livraisons[d][v].value.add(index);
+                        livraisons[d][v][trip].value.add(index);
 
-                        try {
-                            if (can_carry[v]["A"]) {
-                                quantity[d][v][index]["A"].value = place["delivery"][0];
+                        if (!is_ldr[d][v][trip][index]) {
+                            try {
+                                if (can_carry[v]["A"]) {
+                                    quantity[d][v][trip][index]["A"].value = place["delivery"][0];
+                                }
+                                if (can_carry[v]["F"]) {
+                                    quantity[d][v][trip][index]["F"].value = place["delivery"][1];
+                                }
+                                if (can_carry[v]["S"]) {
+                                    quantity[d][v][trip][index]["S"].value = place["delivery"][2];
+                                    norvegiennes[d][v][trip][index].value = place["norvegiennes"];
+                                }
+                            } catch (error) {
+                                println("Warning : could not set quantity for day", d, "vehicle", v, "trip", trip, "centre", place["name"], " ", place["index"], " from input solution");
                             }
-                            if (can_carry[v]["F"]) {
-                                quantity[d][v][index]["F"].value = place["delivery"][1];
-                            }
-                            if (can_carry[v]["S"]) {
-                                quantity[d][v][index]["S"].value = place["delivery"][2];
-                                norvegiennes[d][v][index].value = place["norvegiennes"];
-                            }
-                        } catch (error) {
                         }
+
                     }
 
                 } else {
                     ramasse_init.add(place["index"] - n_centres);
                     if (force){
-                        constraint ramasses[d][v][j] == place["index"] - n_centres;
+                        constraint ramasses[d][v][trip][j] == place["index"] - n_centres;
                         j += 1;
                     } else {
-                        ramasses[d][v].value.add(place["index"] - n_centres);
+                        ramasses[d][v][trip].value.add(place["index"] - n_centres);
                     }
                 }
             }
             if (force) {
-                constraint count(livraisons[d][v]) == livraison_init.count();
-                constraint count(ramasses[d][v]) == ramasse_init.count();
+                constraint count(livraisons[d][v][trip]) == livraison_init.count();
+                constraint count(ramasses[d][v][trip]) == ramasse_init.count();
             }
         }
     }
@@ -787,16 +800,16 @@ function main(args) {
     with(ls = localsolver.create()) {
         ls.addCallback("ITERATION_TICKED", callback);
         ls.param.verbosity = 0 ;
-        // ls.param.verbosity = 2 ;
+        ls.param.verbosity = 2 ;
 
         model();
 
         // set_current_tours();
-
         // // Force the solution to match the input solution
         // set_initial_solution(true, nil);
 
         ls.model.close();
+
 
         if (timelimit != nil) {
             ls.param.timeLimit = timelimit ;
