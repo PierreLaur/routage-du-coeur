@@ -11,6 +11,6 @@
     "wait_at_pdrs": 30,
     "wait_between_trips": 15,
     "vehicle_allowed": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-    "robustness_factor": 1.15,
+    "robustness_factor": 1.0,
     "fuel_cost": 1.8
 }

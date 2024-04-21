@@ -800,7 +800,10 @@ function main(args) {
     with(ls = localsolver.create()) {
         ls.addCallback("ITERATION_TICKED", callback);
         ls.param.verbosity = 0 ;
-        ls.param.verbosity = 2 ;
+        ls.param.seed = 3;
+        // ls.param.timeLimit = 60 ;
+
+        // ls.param.verbosity = 2 ;
 
         model();
 

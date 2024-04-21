@@ -1,0 +1,120 @@
+- - - - - - TOURNEES SEMAINE 1 - - - - - -
+
+- - - - LUNDI - - - -
+
+	Véhicule 1 (Petit Poids Lourd) - est. 3h20min
+		PORTET SUR GARONNE                      	367A      62S  	1PA             +2 norvégiennes
+		MURET                                   	1207A     113S 	2PA             +3 norvégiennes
+		TOULOUSE NEGOGOUSSES                    	1912A          	3PA            
+	Véhicule 2 (Camion Frigo) - est. 2h46min
+		TOULOUSE REVEL MALEPERE                 	          344S 	          0.5PS
+		LECLERC ST ORENS                        	Ramasse	
+		SUPER U FLOURENS                        	Ramasse	
+	Véhicule 3 (Camion Frigo) - est. 2h29min
+		TOULOUSE NEGOGOUSSES                    	19A  938F      	1PA 3.0PF      
+		LECLERC ROUFFIAC                        	Ramasse	
+	Véhicule 4 (Camion Frigo) - est. 2h45min
+		FONSORBES                               	676A 191F 122S 	1PA 1.0PF       +4 norvégiennes
+		LECLERC BLAGNAC                         	Ramasse	
+	Véhicule 6 (Camion Frigo) - est. 4h45min
+		PLAISANCE DU TOUCH                      	303A 249F 29S  	1PA 1.0PF 0.5PS
+		CARBONNE                                	287A 131F 58S  	1PA 0.5PF       +2 norvégiennes
+		    [Retour Dépôt]                      		
+		TOULOUSE NEGOGOUSSES                    	1139A          	2PA            
+	Véhicule 8 (Camion Frigo) - est. 5h41min
+		PORTET SUR GARONNE                      	     129F      	    0.5PF      
+		MURET                                   	127A 677F      	1PA 2.0PF      
+		    [Retour Dépôt]                      		
+		REVEL                                   	     444F 109S 	    1.5PF       +3 norvégiennes
+
+- - - - MARDI - - - -
+
+	Véhicule 0 (Poids Lourd) - est. 5h15min
+		CAZERES                                 	406A           	1PA            
+		SALIES DU SALAT                         	401A           	1PA            
+		ST GAUDENS                              	1309A          	2PA            
+		TOURNEFEUILLE                           	704A           	1PA            
+	Véhicule 2 (Camion Frigo) - est. 2h46min
+		TOULOUSE REVEL MALEPERE                 		
+		LECLERC ST ORENS                        	Ramasse	
+		SUPER U FLOURENS                        	Ramasse	
+	Véhicule 4 (Camion Frigo) - est. 5h24min
+		FENOUILLET                              	717A 205F 71S  	1PA 1.0PF 0.5PS
+		    [Retour Dépôt]                      		
+		SALIES DU SALAT                         	     246F 52S  	    1.0PF 0.5PS
+		ST GAUDENS                              	     488F 162S 	    1.5PF       +5 norvégiennes
+	Véhicule 6 (Camion Frigo) - est. 5h43min
+		MONTREJEAU                              	281A 121F 24S  	1PA 0.5PF       +1 norvégienne
+		BAGNERES DE LUCHON                      	126A 79F  46S  	1PA 0.5PF 0.5PS
+		CAZERES                                 	     128F 17S  	    0.5PF       +1 norvégienne
+	Véhicule 8 (Camion Frigo) - est. 1h38min
+		TOURNEFEUILLE                           	     407F 96S  	    1.5PF 0.5PS
+	Véhicule 11 (Fourgon) - est. 1h40min
+		BESSIERES                               	323A      203S 	1PA             +6 norvégiennes
+		+ livraison de ramasse
+		+ Leclerc Rouffiac
+
+- - - - MERCREDI - - - -
+
+	Véhicule 0 (Poids Lourd) - est. 1h37min
+		CARREFOUR EN JACCA                      	Ramasse	
+	Véhicule 2 (Camion Frigo) - est. 2h46min
+		TOULOUSE REVEL MALEPERE                 		
+		LECLERC ST ORENS                        	Ramasse	
+		SUPER U FLOURENS                        	Ramasse	
+	Véhicule 4 (Camion Frigo) - est. 2h1min
+		LECLERC ROUFFIAC                        	Ramasse	
+		AUCHAN GRAMONT                          	Ramasse	
+	Véhicule 6 (Camion Frigo) - est. 1h37min
+		CARREFOUR LA MENUDE                     	Ramasse	
+			+ distribution Léguevin/pibrac/plaisance...
+
+- - - - JEUDI - - - -
+
+	Véhicule 1 (Petit Poids Lourd) - est. 3h16min
+		BLAGNAC                                 	879A           	2PA            
+		PIBRAC                                  	1343A     124S 	2PA             +4 norvégiennes
+		TOULOUSE GRANDE BRETAGNE                	1364A     127S 	2PA             +4 norvégiennes
+	Véhicule 2 (Camion Frigo) - est. 2h27min
+		TOULOUSE GRANDE BRETAGNE                	     713F      	    2.0PF      
+		LECLERC ST ORENS                        	Ramasse	
+	Véhicule 3 (Camion Frigo) - est. 2h54min
+		VILLEFRANCHE DE LAURAGAIS               	511A 234F 86S  	1PA 1.0PF 0.5PS
+		SUPER U FLOURENS                        	Ramasse	
+	Véhicule 6 (Camion Frigo) - est. 5h4min
+		PIBRAC                                  	     865F 150S 	    2.5PF       +4 norvégiennes
+		LEGUEVIN                                	     92F  32S  	    0.5PF 0.5PS
+		    [Retour Dépôt]                      		
+		AUTERIVE                                	350A 104F 45S  	1PA 0.5PF 0.5PS
+	Véhicule 8 (Camion Frigo) - est. 3h59min
+		BLAGNAC                                 	284A 542F 107S 	1PA 2.0PF       +3 norvégiennes
+		LECLERC BLAGNAC                         	Ramasse	
+		    [Retour Dépôt]                      		 
+		FRONTON                                 	497A 190F 64S  	1PA 1.0PF 0.5PS
+			+ livraison de ramasse
+
+- - - - VENDREDI - - - -
+
+	Véhicule 1 (Petit Poids Lourd) - est. 1h23min
+		TOULOUSE REVEL MALEPERE                 	2761A          	4PA            
+	Véhicule 2 (Camion Frigo) - est. 2h33min
+		TOULOUSE REVEL MALEPERE                 		
+		LECLERC ST ORENS                        	Ramasse	
+		AUCHAN GRAMONT                          	Ramasse	
+	Véhicule 3 (Camion Frigo) - est. 4h14min
+		ESCALQUENS                              	552A 347F 83S  	1PA 1.0PF 0.5PS
+		LECLERC BLAGNAC                         	Ramasse	
+		    [Retour Dépôt]                      		
+		TOULOUSE NEGOGOUSSES                    	          261S 	          0.5PS
+	Véhicule 4 (Camion Frigo) - est. 1h37min
+		CARREFOUR LA MENUDE                     	Ramasse	
+	Véhicule 6 (Camion Frigo) - est. 2h58min
+		TOULOUSE REVEL MALEPERE                 	629A 510F      	1PA 1.5PF      
+		SUPER U FLOURENS                        	Ramasse	
+		LECLERC ROUFFIAC                        	Ramasse	
+
+Coûts totaux : 1009€     (Fixes 102€ | Variables 908€)
+Distance totale : 1983km
+Véhicules utilisés : 5 Camion Frigo - 1 Poids Lourd - 1 Petit Poids Lourd - 1 Fourgon
+
+Date : 2024-04-16

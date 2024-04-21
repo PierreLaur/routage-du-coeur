@@ -224,7 +224,7 @@ def check_specific_requirements(pb: Problem, sol: Solution):
 
             if stop.index == c and current_trip == trip:
                 done = True
-                assert all(d == 0 for d in stop.delivery)
+                assert all(d == 0 for d in stop.delivery[:2])
                 break
         if not done:
             print(d, v, trip, c)

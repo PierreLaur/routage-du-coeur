@@ -235,9 +235,7 @@ def print_to_txt(sol: Solution, output_file_path):
     jours_map = {0: "Lundi", 1: "Mardi", 2: "Mercredi", 3: "Jeudi", 4: "Vendredi"}
 
     output = ""
-    output += (
-        f"- - - - - - TOURNEES SEMAINE {1 if sol.week == 'ODD' else 2} - - - - - -\n"
-    )
+    output += f"- - - - - - TOURNEES SEMAINE {sol.week} - - - - - -\n"
 
     n_days = len(set(k[0] for k in sol.tours))
 

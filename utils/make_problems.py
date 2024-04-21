@@ -39,8 +39,8 @@ def make_all(n_scenarios):
             ]
 
             for k, files in enumerate(combinations(demand_files, n_scenarios)):
-                for week in range(2):
-                    outfile = f"problems/{n_scenarios}s_{i+1}{j+1}{k+1}_w{week+1}.json"
+                for week in range(1, 3):
+                    outfile = f"problems/{n_scenarios}s_{i+1}{j+1}{k+1}_w{week}.json"
                     print("Making problem", outfile)
                     problem = make_problem(
                         files,

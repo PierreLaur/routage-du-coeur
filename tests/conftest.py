@@ -13,6 +13,8 @@ problem_files = [
         # "1s_113_w2.json",
         "1s_114_w1.json",
         "1s_114_w2.json",
+        "1s_121_w1.json",
+        "1s_121_w2.json",
         # "1s_116_w1.json",
         # "1s_116_w2.json",
     ]

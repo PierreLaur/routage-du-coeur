@@ -46,6 +46,8 @@ if __name__ == "__main__":
         time_limit=args.time_limit,
     )
 
+    # solution = solve_day_per_day(problem)
+
     if args.outfile and solution:
         solution.to_json(args.outfile)
         print_to_txt(solution, args.outfile.split(".json")[0] + ".txt")

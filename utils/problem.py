@@ -406,7 +406,7 @@ class Problem:
             (1, 2, 0, index_malepere),
             (2, 2, 0, index_malepere),
             (4, 2, 0, index_malepere),
-            (4, 2, 1, index_arenes),
+            (4, 3, 1, index_arenes),
         }
 
         params = Params(

@@ -4,6 +4,7 @@ from math import inf, ceil
 from utils.problem import Problem, Solution, DeliveryWeek, ProductType, Stop, StopType
 from typing import Any
 import numpy as np
+from copy import deepcopy
 
 
 class LogPrinter(cp_model.CpSolverSolutionCallback):
@@ -154,28 +155,50 @@ def set_current_tours(
     vars: VarContainer,
 ):
     """Sets the current tours as a hint to the solver"""
-    with open(
-        f"data/current/tours_tournees_actuelles_w{pb.params.week.value}.json", "r"
-    ) as f:
+    # current_tours_file = (
+    #     f"data/current/tours_tournees_actuelles_w{pb.params.week.value}.json"
+    # )
+    current_tours_file = "data/current/2602.json"
+    with open(current_tours_file, "r") as f:
         tours = json.load(f)
         for d in range(pb.n_days):
             for v in range(pb.m):
                 key = f"({d}, {v})"
                 if key in tours:
-                    for trip in range(pb.params.max_trips):
-                        for c in range(1, pb.n_centres + pb.n_pdr):
-                            if (d, v, c) not in vars.visits:
-                                continue
+                    trip = 0
+                    n_stops = 0
 
-                            if c in tours[key][1:-1]:
-                                model.add_hint(vars.visits[d, v, trip, c], 1)
-                            else:
-                                model.add_hint(vars.visits[d, v, trip, c], 0)
+                    for stop in tours[key][1:-1]:
+                        if stop == 0:
+                            model.Add(
+                                sum(
+                                    vars.visits[d, v, trip, s]
+                                    for s in range(1, pb.n_centres + pb.n_pdr)
+                                    if (d, v, trip, s) in vars.visits
+                                )
+                                == n_stops
+                            )
+                            trip += 1
+                            n_stops = 0
+                            continue
+                        model.add_hint(vars.visits[d, v, trip, stop], 1)
+                        n_stops += 1
+
+                    model.Add(
+                        sum(
+                            vars.visits[d, v, trip, s]
+                            for s in range(1, pb.n_centres + pb.n_pdr)
+                            if (d, v, trip, s) in vars.visits
+                        )
+                        == n_stops
+                    )
+                    for t in range(trip + 1, pb.params.max_trips):
+                        model.add_hint(vars.visits[d, v, t, 0], 0)
+
                 else:
                     for trip in range(pb.params.max_trips):
-                        for c in range(pb.n_centres + pb.n_pdr):
-                            if (d, v, c) in vars.visits:
-                                model.add_hint(vars.visits[d, v, trip, c], 0)
+                        if (d, v, trip, 0) in vars.visits:
+                            model.add_hint(vars.visits[d, v, trip, 0], 0)
 
 
 def prune_arcs(n_nodes, matrix, limit=1.0):
@@ -246,67 +269,74 @@ def post_process(
 
     for (d, v), tour in tours.items():
         # Remove any useless norvegiennes and demi palettes for s products
-        for c in tour:
-            if (d, v, c, ProductType.S) not in demi_palettes:
+        trip = 0
+        for c in tour[1:-1]:
+            if c == 0:
+                trip += 1
+                continue
+
+            if (d, v, trip, c, ProductType.S) not in demi_palettes:
                 continue
 
             new_n_norvegiennes = max(
                 0,
                 ceil(
                     (
-                        delivers[d, v, c, ProductType.S]
-                        - demi_palettes[d, v, c, ProductType.S]
+                        delivers[d, v, trip, c, ProductType.S]
+                        - demi_palettes[d, v, trip, c, ProductType.S]
                         * pb.params.demi_palette_capacity
                     )
                     / pb.params.norvegienne_capacity
                 ),
             )
-            if norvegiennes[d, v, c] != new_n_norvegiennes:
-                norvegiennes[d, v, c] = new_n_norvegiennes
+
+            if norvegiennes[d, v, trip, c] != new_n_norvegiennes:
+                norvegiennes[d, v, trip, c] = new_n_norvegiennes
 
             new_n_demi_palettes_s = max(
                 0,
                 ceil(
                     (
-                        delivers[d, v, c, ProductType.S]
-                        - norvegiennes[d, v, c] * pb.params.norvegienne_capacity
+                        delivers[d, v, trip, c, ProductType.S]
+                        - norvegiennes[d, v, trip, c] * pb.params.norvegienne_capacity
                     )
                     / pb.params.demi_palette_capacity
                 ),
             )
 
-            if demi_palettes[d, v, c, ProductType.S] != new_n_demi_palettes_s:
-                demi_palettes[d, v, c, ProductType.S] = new_n_demi_palettes_s
+            if demi_palettes[d, v, trip, c, ProductType.S] != new_n_demi_palettes_s:
+                demi_palettes[d, v, trip, c, ProductType.S] = new_n_demi_palettes_s
 
-        # Remove any useless palettes for f products
-        for c in tour:
-            if (d, v, c, ProductType.F) not in demi_palettes:
+            # Remove any useless palettes for f products
+            if (d, v, trip, c, ProductType.F) not in demi_palettes:
                 continue
 
             new_n_demi_palettes = max(
                 0,
                 ceil(
                     2
-                    * delivers[d, v, c, ProductType.F]
+                    * delivers[d, v, trip, c, ProductType.F]
                     / pb.params.demi_palette_capacity
                 ),
             )
 
-            if demi_palettes[d, v, c, ProductType.F] != new_n_demi_palettes:
-                demi_palettes[d, v, c, ProductType.F] = new_n_demi_palettes
+            if demi_palettes[d, v, trip, c, ProductType.F] != new_n_demi_palettes:
+                demi_palettes[d, v, trip, c, ProductType.F] = new_n_demi_palettes
 
-        # Remove any useless palettes for a products
-        for c in tour:
-            if (d, v, c) not in palettes:
+            # Remove any useless palettes for a products
+            if (d, v, trip, c) not in palettes:
                 continue
 
             new_n_palettes = max(
                 0,
-                ceil(delivers[d, v, c, ProductType.A] / pb.params.max_palette_capacity),
+                ceil(
+                    delivers[d, v, trip, c, ProductType.A]
+                    / pb.params.max_palette_capacity
+                ),
             )
 
-            if palettes[d, v, c] != new_n_palettes:
-                palettes[d, v, c] = new_n_palettes
+            if palettes[d, v, trip, c] != new_n_palettes:
+                palettes[d, v, trip, c] = new_n_palettes
 
 
 def make_solution(pb: Problem, vars: VarContainer, solver: cp_model.CpSolver):
@@ -347,17 +377,18 @@ def make_solution(pb: Problem, vars: VarContainer, solver: cp_model.CpSolver):
                 trip += 1
             elif node < pb.n_centres:
                 stop.delivery = (
-                    solver.value(delivers[d, v, trip, node, ProductType.A]),
-                    solver.value(delivers[d, v, trip, node, ProductType.F]),
-                    solver.value(delivers[d, v, trip, node, ProductType.S]),
+                    delivers[d, v, trip, node, ProductType.A],
+                    delivers[d, v, trip, node, ProductType.F],
+                    delivers[d, v, trip, node, ProductType.S],
                 )
                 stop.palettes = (
-                    solver.value(palettes[d, v, trip, node]),
-                    0.5 * solver.value(demi_palettes[d, v, trip, node, ProductType.F]),
-                    0.5 * solver.value(demi_palettes[d, v, trip, node, ProductType.S]),
+                    palettes[d, v, trip, node],
+                    0.5 * demi_palettes[d, v, trip, node, ProductType.F],
+                    0.5 * demi_palettes[d, v, trip, node, ProductType.S],
                 )
 
-                stop.norvegiennes = solver.value(norvegiennes[d, v, trip, node])
+                stop.norvegiennes = norvegiennes[d, v, trip, node]
+
             t.append(stop)
         tours[d, v] = t
 
@@ -378,7 +409,9 @@ def make_solution(pb: Problem, vars: VarContainer, solver: cp_model.CpSolver):
     return sol
 
 
-def create_tour_variables(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
+def create_tour_variables(
+    pb: Problem, model: cp_model.CpModel, vars: VarContainer, use_all_vehicles=False
+):
     """Creates arcs and visits variables and loads them into the VarContainer and the model"""
     n_nodes = pb.n_nodes
     used_nodes = pb.used_nodes
@@ -390,6 +423,8 @@ def create_tour_variables(pb: Problem, model: cp_model.CpModel, vars: VarContain
         print(f"    Pruned arcs : {100*len(pruned)/(n_nodes)**2:.2f}%")
 
     vars.used = {v: model.new_bool_var("") for v in allowed_vehicles}
+    if use_all_vehicles:
+        model.add_bool_and(vars.used.values())
 
     ########## Arcs & Visit variables ###########
     for d in range(pb.n_days):
@@ -618,7 +653,7 @@ def add_time_windows(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
                 )
 
 
-def add_cover_constraints(pb: Problem, model, vars: VarContainer):
+def add_cover_constraints(pb: Problem, model, vars: VarContainer, loose=False):
     fourgon_capacity = 1200
     for c in pb.delivered_centres:
         # Redundant Cover constraint
@@ -636,6 +671,9 @@ def add_cover_constraints(pb: Problem, model, vars: VarContainer):
 
         # more than 3 visits is unreasonable in practice
         max_visits = min(max_visits, 3)
+
+        if loose:
+            max_visits = 3
 
         model.add_linear_constraint(
             sum(
@@ -756,13 +794,18 @@ def add_capacity_constraints(pb: Problem, model: cp_model.CpModel, vars: VarCont
                 )
 
 
-def add_duration_constraints(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
+def add_duration_constraints(
+    pb: Problem, model: cp_model.CpModel, vars: VarContainer, loose=False
+):
     delivered_centres = pb.delivered_centres
     pdr_nodes = pb.pdr_nodes
 
     # Duration constraints
     for d in range(pb.n_days):
         for v in pb.allowed_vehicles:
+            if loose:
+                if (d, v) in [(1, 7), (1, 0)]:
+                    continue
             pickups = model.new_bool_var("")
             model.add_bool_and(
                 vars.visits[d, v, 0, p].negated() for p in pdr_nodes
@@ -862,7 +905,7 @@ def add_specific_requirements(pb: Problem, model: cp_model.CpModel, vars: VarCon
             for c2 in pb.delivered_centres
             if (d, v, trip, c2) in vars.visits
         )
-        for t in ProductType:
+        for t in [ProductType.A, ProductType.F]:
             model.add(vars.delivers[d, v, trip, c, t] == 0)
 
 
@@ -926,7 +969,7 @@ def add_decision_strategies(pb: Problem, model: cp_model.CpModel, vars: VarConta
 
 def add_manual_pruning(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
     model.add(sum(vars.used.values()) <= 8)
-    model.add(vars.total_distance <= 2_500_000)
+    # model.add(vars.total_distance <= 2_500_000)
     return
 
 
@@ -936,6 +979,7 @@ def solve_vrp(
     time_limit=None,
     stop_at_first_solution=False,
     fix_hint=False,
+    use_all_vehicles=False,
 ):
     """Creates a CP model and solves it with cp-sat.
     When done, re-optimizes the solution and writes it in JSON format to the specified file
@@ -947,13 +991,13 @@ def solve_vrp(
     vars = VarContainer()
 
     print("\r[CP-SAT] Creating variables...", end="")
-    create_tour_variables(pb, model, vars)
+    create_tour_variables(pb, model, vars, use_all_vehicles)
     create_load_variables(pb, model, vars)
     create_duration_variables(pb, model, vars)
 
     print("\r[CP-SAT] Adding constraints 0/10        ", end="")
     add_time_windows(pb, model, vars)
-    add_cover_constraints(pb, model, vars)
+    add_cover_constraints(pb, model, vars, loose=True)
     add_duration_constraints(pb, model, vars)
 
     print("\r[CP-SAT] Adding constraints 3/10        ", end="")
@@ -967,11 +1011,11 @@ def solve_vrp(
 
     add_specific_requirements(pb, model, vars)
     # add_domsym_breaking(pb, model, vars)
-    add_decision_strategies(pb, model, vars)
+    # add_decision_strategies(pb, model, vars)
 
     print("\r[CP-SAT] Adding objective        ", end="")
     add_objective(pb, model, vars)
-    add_manual_pruning(pb, model, vars)
+    # add_manual_pruning(pb, model, vars)
 
     # Add input file as a hint
     if hint:
@@ -985,13 +1029,13 @@ def solve_vrp(
     solver = cp_model.CpSolver()
 
     # set_current_tours(pb, model, vars)
+    # solver.parameters.fix_variables_to_their_hinted_value = True
     if hint and fix_hint:
         solver.parameters.fix_variables_to_their_hinted_value = True
-    # solver.parameters.fix_variables_to_their_hinted_value = True
 
     solver.parameters.num_workers = 16
     solver.parameters.use_lns_only = True
-    # solver.parameters.diversify_lns_params = True
+    solver.parameters.diversify_lns_params = True
 
     if time_limit:
         solver.parameters.max_time_in_seconds = time_limit
@@ -1010,3 +1054,46 @@ def solve_vrp(
     else:
         sol = make_solution(pb, vars, solver)
         return status, sol
+
+
+def solve_day_per_day(
+    pb: Problem,
+):
+    # Assign each centre to a single day
+    for c in range(pb.n_centres):
+        while len(pb.centres[c].allowed_days) > 1:
+            pb.centres[c].allowed_days.pop()
+
+    solutions: list[Solution] = []
+    for d in range(pb.n_days):
+        day_problem = deepcopy(pb)
+
+        for c in range(pb.n_centres):
+            if d not in day_problem.centres[c].allowed_days:
+                match pb.params.week:
+                    case DeliveryWeek.ODD:
+                        day_problem.centres[c].delivery_week = DeliveryWeek.EVEN
+                    case DeliveryWeek.EVEN:
+                        day_problem.centres[c].delivery_week = DeliveryWeek.ODD
+        for p in range(pb.n_pdr):
+            day_problem.pdrs[p].required_days = {d} & day_problem.pdrs[p].required_days
+
+        status, sol = solve_vrp(day_problem, use_all_vehicles=True)
+        if sol:
+            solutions.append(sol)
+
+    # Aggregate into a single solution
+    solution = solutions[0]
+    for d in range(1, len(solutions)):
+        solution.variable_costs += solutions[d].variable_costs
+        solution.total_costs += solutions[d].variable_costs
+        solution.total_distance += solutions[d].total_distance
+        solution.tour_durations.update(solutions[d].tour_durations)
+        solution.tours.update(solutions[d].tours)
+
+    print(solution.tour_durations)
+    print(solution.tours)
+
+    solution.adjust_durations(pb)
+
+    return solution
