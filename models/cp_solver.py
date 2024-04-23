@@ -1,7 +1,14 @@
 import json
 from ortools.sat.python import cp_model
 from math import inf, ceil
-from utils.problem import Problem, Solution, DeliveryWeek, ProductType, Stop, StopType
+from utils.datatypes import (
+    LoadType,
+    DeliveryWeek,
+    ProductType,
+    Stop,
+    StopType,
+)
+from utils.problem import Problem, Solution
 from typing import Any
 import numpy as np
 from copy import deepcopy
@@ -45,19 +52,10 @@ class VarContainer:
     def __init__(self) -> None:
         self.arcs: dict[tuple[int, int, int], np.ndarray] = {}
         self.visits: dict[tuple[int, int, int, int], cp_model.IntVar] = {}
-        self.delivers: dict[
-            tuple[int, int, int, int, ProductType], cp_model.IntVar
-        ] = {}
-        self.palettes: dict[tuple[int, int, int, int], cp_model.IntVar] = {}
-        self.demi_palettes: dict[
-            tuple[int, int, int, int, ProductType], cp_model.IntVar
-        ] = {}
-        self.norvegiennes: dict[tuple[int, int, int, int], cp_model.IntVar] = {}
-
+        self.delivers: dict[tuple[int, int, int, int, int], cp_model.IntVar] = {}
         self.route_dist: dict[tuple[int, int], Any] = {}
         self.tour_duration: dict[tuple[int, int], Any] = {}
         self.trip_duration: dict[tuple[int, int, int], Any] = {}
-
         self.used: dict[int, cp_model.IntVar] = {}
 
 
@@ -105,42 +103,6 @@ def add_hint(
                 if b == 0:
                     trip += 1
                     continue
-
-                if (
-                    b < pb.n_centres
-                    and (d, v, trip, b) in vars.palettes
-                    and pb.centres[b].delivery_week
-                    in [DeliveryWeek.ANY, pb.params.week]
-                ):
-                    for product_type in ProductType:
-                        if product_type in pb.vehicles[v].can_carry:
-                            model.add_hint(
-                                vars.delivers[d, v, trip, b, product_type],
-                                stop.delivery[product_type.value],
-                            )
-
-                    if ProductType.A in pb.vehicles[v].can_carry:
-                        model.add_hint(
-                            vars.palettes[d, v, trip, b],
-                            ceil(stop.palettes[0]),
-                        )
-
-                    if ProductType.F in pb.vehicles[v].can_carry:
-                        model.add_hint(
-                            vars.demi_palettes[d, v, trip, b, ProductType.F],
-                            round(stop.palettes[1] * 2),
-                        )
-
-                    if ProductType.S in pb.vehicles[v].can_carry:
-                        model.add_hint(
-                            vars.norvegiennes[d, v, trip, b],
-                            stop.norvegiennes,
-                        )
-                        if pb.vehicles[v].allows_isotherm_cover:
-                            model.add_hint(
-                                vars.demi_palettes[d, v, trip, b, ProductType.S],
-                                round(stop.palettes[2] * 2),
-                            )
 
             model.add_hint(vars.arcs[d, v, trip][a, 0], 1)
             to_assign.remove((trip, a, 0))
@@ -215,6 +177,7 @@ def prune_arcs(n_nodes, matrix, limit=1.0):
 def read_tours(pb: Problem, vars: VarContainer, solver):
     """Reads tours from the solver
     Returns a dictionary of tours with keys (day, vehicle)"""
+
     tours: dict[tuple[int, int], list[int]] = {}
     for d in range(pb.n_days):
         for v in pb.allowed_vehicles:
@@ -255,110 +218,15 @@ def read_tours(pb: Problem, vars: VarContainer, solver):
     return tours
 
 
-def post_process(
-    pb: Problem,
-    tours,
-    delivers,
-    palettes,
-    demi_palettes,
-    norvegiennes,
-    tour_duration,
+def make_solution(
+    pb: Problem, week: DeliveryWeek, vars: VarContainer, solver: cp_model.CpSolver
 ):
-    """Shaves any superfluous decisions (useless norvegiennes/palettes) from the solution
-    Also adds the time required to come back to the depot to the tour duration"""
-
-    for (d, v), tour in tours.items():
-        # Remove any useless norvegiennes and demi palettes for s products
-        trip = 0
-        for c in tour[1:-1]:
-            if c == 0:
-                trip += 1
-                continue
-
-            if (d, v, trip, c, ProductType.S) not in demi_palettes:
-                continue
-
-            new_n_norvegiennes = max(
-                0,
-                ceil(
-                    (
-                        delivers[d, v, trip, c, ProductType.S]
-                        - demi_palettes[d, v, trip, c, ProductType.S]
-                        * pb.params.demi_palette_capacity
-                    )
-                    / pb.params.norvegienne_capacity
-                ),
-            )
-
-            if norvegiennes[d, v, trip, c] != new_n_norvegiennes:
-                norvegiennes[d, v, trip, c] = new_n_norvegiennes
-
-            new_n_demi_palettes_s = max(
-                0,
-                ceil(
-                    (
-                        delivers[d, v, trip, c, ProductType.S]
-                        - norvegiennes[d, v, trip, c] * pb.params.norvegienne_capacity
-                    )
-                    / pb.params.demi_palette_capacity
-                ),
-            )
-
-            if demi_palettes[d, v, trip, c, ProductType.S] != new_n_demi_palettes_s:
-                demi_palettes[d, v, trip, c, ProductType.S] = new_n_demi_palettes_s
-
-            # Remove any useless palettes for f products
-            if (d, v, trip, c, ProductType.F) not in demi_palettes:
-                continue
-
-            new_n_demi_palettes = max(
-                0,
-                ceil(
-                    2
-                    * delivers[d, v, trip, c, ProductType.F]
-                    / pb.params.demi_palette_capacity
-                ),
-            )
-
-            if demi_palettes[d, v, trip, c, ProductType.F] != new_n_demi_palettes:
-                demi_palettes[d, v, trip, c, ProductType.F] = new_n_demi_palettes
-
-            # Remove any useless palettes for a products
-            if (d, v, trip, c) not in palettes:
-                continue
-
-            new_n_palettes = max(
-                0,
-                ceil(
-                    delivers[d, v, trip, c, ProductType.A]
-                    / pb.params.max_palette_capacity
-                ),
-            )
-
-            if palettes[d, v, trip, c] != new_n_palettes:
-                palettes[d, v, trip, c] = new_n_palettes
-
-
-def make_solution(pb: Problem, vars: VarContainer, solver: cp_model.CpSolver):
     tours_flat = read_tours(pb, vars, solver)
     delivers = {k: solver.value(v) for k, v in vars.delivers.items()}
-    palettes = {k: solver.value(v) for k, v in vars.palettes.items()}
-    demi_palettes = {k: solver.value(v) for k, v in vars.demi_palettes.items()}
-    norvegiennes = {k: solver.value(v) for k, v in vars.norvegiennes.items()}
 
     tour_duration = {
         k: solver.value(v) for k, v in vars.tour_duration.items() if k in tours_flat
     }
-
-    post_process(
-        pb,
-        tours_flat,
-        delivers,
-        palettes,
-        demi_palettes,
-        norvegiennes,
-        tour_duration,
-    )
 
     tours = {}
     for (d, v), tour in tours_flat.items():
@@ -377,23 +245,58 @@ def make_solution(pb: Problem, vars: VarContainer, solver: cp_model.CpSolver):
                 trip += 1
             elif node < pb.n_centres:
                 stop.delivery = (
-                    delivers[d, v, trip, node, ProductType.A],
-                    delivers[d, v, trip, node, ProductType.F],
-                    delivers[d, v, trip, node, ProductType.S],
-                )
-                stop.palettes = (
-                    palettes[d, v, trip, node],
-                    0.5 * demi_palettes[d, v, trip, node, ProductType.F],
-                    0.5 * demi_palettes[d, v, trip, node, ProductType.S],
+                    sum(
+                        delivers[d, v, trip, node, dem] * pb.demands[node][dem].weight
+                        for dem in range(len(pb.demands[node]))
+                        if pb.demands[node][dem].product_type == ProductType.A
+                    ),
+                    sum(
+                        delivers[d, v, trip, node, dem] * pb.demands[node][dem].weight
+                        for dem in range(len(pb.demands[node]))
+                        if pb.demands[node][dem].product_type == ProductType.F
+                    ),
+                    sum(
+                        delivers[d, v, trip, node, dem] * pb.demands[node][dem].weight
+                        for dem in range(len(pb.demands[node]))
+                        if pb.demands[node][dem].product_type == ProductType.S
+                    ),
                 )
 
-                stop.norvegiennes = norvegiennes[d, v, trip, node]
+                stop.palettes = (
+                    sum(
+                        delivers[d, v, trip, node, dem]
+                        * pb.demands[node][dem].load_type.size_in_demi_palettes()
+                        for dem in range(len(pb.demands[node]))
+                        if pb.demands[node][dem].product_type == ProductType.A
+                    )
+                    // 2,
+                    0.5
+                    * sum(
+                        delivers[d, v, trip, node, dem]
+                        * pb.demands[node][dem].load_type.size_in_demi_palettes()
+                        for dem in range(len(pb.demands[node]))
+                        if pb.demands[node][dem].product_type == ProductType.F
+                    ),
+                    0.5
+                    * sum(
+                        delivers[d, v, trip, node, dem]
+                        * pb.demands[node][dem].load_type.size_in_demi_palettes()
+                        for dem in range(len(pb.demands[node]))
+                        if pb.demands[node][dem].product_type == ProductType.S
+                    ),
+                )
+
+                stop.norvegiennes = sum(
+                    delivers[d, v, trip, node, dem]
+                    for dem in range(len(pb.demands[node]))
+                    if pb.demands[node][dem].load_type == LoadType.NORVEGIENNE
+                )
 
             t.append(stop)
         tours[d, v] = t
 
     sol = Solution(
-        pb.params.week.value,
+        week,
         round(solver.value(vars.total_costs), 3),  # type: ignore
         round(solver.value(vars.fixed_costs), 3),  # type: ignore
         round(solver.value(vars.variable_costs), 3),  # type: ignore
@@ -410,11 +313,15 @@ def make_solution(pb: Problem, vars: VarContainer, solver: cp_model.CpSolver):
 
 
 def create_tour_variables(
-    pb: Problem, model: cp_model.CpModel, vars: VarContainer, use_all_vehicles=False
+    pb: Problem,
+    week: DeliveryWeek,
+    model: cp_model.CpModel,
+    vars: VarContainer,
+    use_all_vehicles=False,
 ):
     """Creates arcs and visits variables and loads them into the VarContainer and the model"""
     n_nodes = pb.n_nodes
-    used_nodes = pb.used_nodes
+    used_nodes = pb.used_nodes(week)
     allowed_vehicles = pb.allowed_vehicles
 
     # Optionally prune some long arcs to make solving easier
@@ -467,7 +374,7 @@ def create_tour_variables(
                 # If you don't visit the depot, visit nothing
                 model.add_bool_and(
                     vars.visits[d, v, trip, node].negated()
-                    for node in pb.delivered_centres
+                    for node in pb.delivered_centres(week)
                     + list(range(pb.n_centres, pb.n_centres + pb.n_pdr))
                 ).only_enforce_if(vars.visits[d, v, trip, 0].negated())
 
@@ -486,54 +393,37 @@ def create_tour_variables(
                 )
 
 
-def create_load_variables(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
+def create_load_variables(
+    pb: Problem, week: DeliveryWeek, model: cp_model.CpModel, vars: VarContainer
+):
     """Creates the deliveries, palettes and norvegiennes variables and loads them into the VarContainer and the model"""
 
     ########## Load variables & constraints ###########
     for d in range(pb.n_days):
         for v in pb.allowed_vehicles:
             for trip in range(pb.params.max_trips):
-                for c in pb.delivered_centres:
-                    for t in ProductType:
-                        max_demands = max(
-                            scenario[t] for scenario in pb.centres[c].demands
-                        )
-                        vars.delivers[d, v, trip, c, t] = (
-                            model.new_int_var(
-                                0,
-                                min(pb.vehicles[v].capacity, max_demands),
-                                "",
-                            )
-                            if t in pb.vehicles[v].can_carry
-                            else model.new_constant(0)
-                        )
+                for c in pb.delivered_centres(week):
+                    for i, demand in enumerate(pb.demands[c]):
+                        can_deliver = True
+                        if demand.product_type not in pb.vehicles[v].can_carry:
+                            can_deliver = False
+                        if (
+                            demand.product_type == ProductType.S
+                            and demand.load_type == LoadType.DEMI_PALETTE
+                            and not pb.vehicles[v].allows_isotherm_cover
+                        ):
+                            can_deliver = False
 
-                    vars.palettes[d, v, trip, c] = model.new_int_var(
-                        0, pb.vehicles[v].size, ""
-                    )
-
-                    vars.demi_palettes[d, v, trip, c, ProductType.F] = (
-                        model.new_int_var(0, 2 * pb.vehicles[v].size, "")
-                        if ProductType.F in pb.vehicles[v].can_carry
-                        else model.new_constant(0)
-                    )
-
-                    vars.demi_palettes[d, v, trip, c, ProductType.S] = (
-                        model.new_int_var(0, 2 * pb.vehicles[v].size, "")
-                        if ProductType.S in pb.vehicles[v].can_carry
-                        and pb.vehicles[v].allows_isotherm_cover
-                        else model.new_constant(0)
-                    )
-
-                    vars.norvegiennes[d, v, trip, c] = (
-                        model.new_int_var(0, pb.params.n_norvegiennes, "")
-                        if ProductType.S in pb.vehicles[v].can_carry
-                        else model.new_constant(0)
-                    )
+                        if can_deliver:
+                            vars.delivers[d, v, trip, c, i] = model.new_bool_var("")
+                        else:
+                            vars.delivers[d, v, trip, c, i] = model.new_constant(0)
 
 
-def create_duration_variables(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
-    delivered_centres = pb.delivered_centres
+def create_duration_variables(
+    pb: Problem, week: DeliveryWeek, model: cp_model.CpModel, vars: VarContainer
+):
+    delivered_centres = pb.delivered_centres(week)
     pdr_nodes = pb.pdr_nodes
     for d in range(pb.n_days):
         for v in pb.allowed_vehicles:
@@ -559,56 +449,24 @@ def create_duration_variables(pb: Problem, model: cp_model.CpModel, vars: VarCon
             )
 
 
-def add_load_constraints(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
+def add_load_constraints(
+    pb: Problem, week: DeliveryWeek, model: cp_model.CpModel, vars: VarContainer
+):
     """Adds the deliveries, palettes and norvegiennes constraints to the model"""
     for d in range(pb.n_days):
         for v in pb.allowed_vehicles:
             for trip in range(pb.params.max_trips):
-                for c in pb.delivered_centres:
-                    # Use an appropriate number of palettes for each type of product
-                    model.add(
-                        vars.palettes[d, v, trip, c] * pb.params.max_palette_capacity
-                        >= vars.delivers[d, v, trip, c, ProductType.A]
-                    )
-                    # Use twice the required number of demi palettes for F - this is for fruits & vegetables
-                    model.add(
-                        vars.demi_palettes[d, v, trip, c, ProductType.F]
-                        * pb.params.demi_palette_capacity
-                        >= 2 * vars.delivers[d, v, trip, c, ProductType.F]  # type: ignore
-                    )
-
-                    model.add(
-                        vars.demi_palettes[d, v, trip, c, ProductType.S]
-                        * pb.params.demi_palette_capacity
-                        + vars.norvegiennes[d, v, trip, c]
-                        * pb.params.norvegienne_capacity
-                        >= vars.delivers[d, v, trip, c, ProductType.S]  # type: ignore
-                    )
-
+                for c in pb.delivered_centres(week):
                     # Not visited -> delivery is 0
-                    model.add(vars.palettes[d, v, trip, c] == 0).only_enforce_if(
-                        vars.visits[d, v, trip, c].negated()
-                    )
-                    for t in [ProductType.F, ProductType.S]:
-                        model.add(
-                            vars.demi_palettes[d, v, trip, c, t] == 0
-                        ).only_enforce_if(vars.visits[d, v, trip, c].negated())
-                    model.add(vars.norvegiennes[d, v, trip, c] == 0).only_enforce_if(
-                        vars.visits[d, v, trip, c].negated()
-                    )
-                    for t in ProductType:
-                        model.add(vars.delivers[d, v, trip, c, t] == 0).only_enforce_if(
-                            vars.visits[d, v, trip, c].negated()
-                        )
-                        model.add(vars.delivers[d, v, trip, c, t] == 0).only_enforce_if(
-                            vars.visits[d, v, trip, c].negated()
-                        )
-                        model.add(vars.delivers[d, v, trip, c, t] == 0).only_enforce_if(
-                            vars.visits[d, v, trip, c].negated()
-                        )
+                    model.add_bool_and(
+                        vars.delivers[d, v, trip, c, dem].negated()
+                        for dem in range(len(pb.demands[c]))
+                    ).only_enforce_if(vars.visits[d, v, trip, c].negated())
 
 
-def add_time_windows(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
+def add_time_windows(
+    pb: Problem, week: DeliveryWeek, model: cp_model.CpModel, vars: VarContainer
+):
     allowed_vehicles = pb.allowed_vehicles
 
     for d in range(pb.n_days):
@@ -640,7 +498,7 @@ def add_time_windows(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
                 )
 
     # Only deliver centres on allowed days
-    for c in pb.delivered_centres:
+    for c in pb.delivered_centres(week):
         for d in range(pb.n_days):
             if d not in pb.centres[c].allowed_days:
                 model.add_bool_and(
@@ -653,21 +511,21 @@ def add_time_windows(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
                 )
 
 
-def add_cover_constraints(pb: Problem, model, vars: VarContainer, loose=False):
+def add_cover_constraints(
+    pb: Problem, week: DeliveryWeek, model, vars: VarContainer, loose=False
+):
     fourgon_capacity = 1200
-    for c in pb.delivered_centres:
+    for c in pb.delivered_centres(week):
         # Redundant Cover constraint
-        max_sum_demands = max(
-            sum(scenario.values()) for scenario in pb.centres[c].demands
-        )
+        sum_demands = sum(dem.weight for dem in pb.demands[c])
 
-        if max_sum_demands > fourgon_capacity:
+        if sum_demands > fourgon_capacity:
             min_visits = 2
         else:
             min_visits = 1
 
         # # Heuristic pruning rule (very effective)
-        max_visits = ceil(max_sum_demands / pb.params.max_palette_capacity)
+        max_visits = ceil(sum_demands / pb.params.max_palette_capacity)
 
         # more than 3 visits is unreasonable in practice
         max_visits = min(max_visits, 3)
@@ -689,68 +547,36 @@ def add_cover_constraints(pb: Problem, model, vars: VarContainer, loose=False):
         )
 
 
-def add_demand_constraints(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
+def add_demand_constraints(
+    pb: Problem, week: DeliveryWeek, model: cp_model.CpModel, vars: VarContainer
+):
     # Every customer must be served his demand
-    for c in pb.delivered_centres:
-        for type in ProductType:
-            model.add(
-                sum(
-                    vars.delivers[d, v, trip, c, type]
-                    for v in pb.allowed_vehicles
-                    for trip in range(pb.params.max_trips)
-                    for d in range(pb.n_days)
-                )
-                == pb.centres[c].demands[0][type]
+    for c in pb.delivered_centres(week):
+        for dem in range(len(pb.demands[c])):
+            model.add_exactly_one(
+                vars.delivers[d, v, trip, c, dem]
+                for d in range(pb.n_days)
+                for v in pb.allowed_vehicles
+                for trip in range(pb.params.max_trips)
             )
 
 
-def add_robust_demand_constraints(
-    pb: Problem, model: cp_model.CpModel, vars: VarContainer
+def add_capacity_constraints(
+    pb: Problem, week: DeliveryWeek, model: cp_model.CpModel, vars: VarContainer
 ):
-    for c in pb.delivered_centres:
-        for type in ProductType:
-            model.add(
-                sum(
-                    vars.delivers[d, v, trip, c, type]
-                    for v in pb.allowed_vehicles
-                    for trip in range(pb.params.max_trips)
-                    for d in range(pb.n_days)
-                )
-                == max(scenario[type] for scenario in pb.centres[c].demands)
-            )
-
-
-def add_stochastic_demand_constraints(
-    pb: Problem, model: cp_model.CpModel, vars: VarContainer, percentage=1.0
-):
-    satisfied = [model.new_bool_var("") for _ in range(len(pb.centres[1].demands))]
-    for c in pb.delivered_centres:
-        for i, scenario in enumerate(pb.centres[c].demands):
-            for type in ProductType:
-                model.add(
-                    sum(
-                        vars.delivers[d, v, trip, c, type]
-                        for v in pb.allowed_vehicles
-                        for trip in range(pb.params.max_trips)
-                        for d in range(pb.n_days)
-                    )
-                    >= scenario[type]
-                ).only_enforce_if(satisfied[i])
-
-    model.add(sum(satisfied) >= ceil(len(satisfied) * percentage))
-
-
-def add_capacity_constraints(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
-    delivered_centres = pb.delivered_centres
+    delivered_centres = pb.delivered_centres(week)
     allowed_vehicles = pb.allowed_vehicles
+
     # Capacity constraints
     for d in range(pb.n_days):
         model.add(
             sum(
-                vars.norvegiennes[d, v, trip, c]
+                vars.delivers[d, v, trip, c, dem]
                 for v in allowed_vehicles
                 for trip in range(pb.params.max_trips)
                 for c in delivered_centres
+                for dem in range(len(pb.demands[c]))
+                if pb.demands[c][dem].load_type == LoadType.NORVEGIENNE
             )
             <= pb.params.n_norvegiennes
         )
@@ -760,9 +586,9 @@ def add_capacity_constraints(pb: Problem, model: cp_model.CpModel, vars: VarCont
                 # Delivery
                 model.add(
                     sum(
-                        vars.delivers[d, v, trip, c, t]
+                        vars.delivers[d, v, trip, c, dem] * pb.demands[c][dem].weight
                         for c in delivered_centres
-                        for t in ProductType
+                        for dem in range(len(pb.demands[c]))
                     )
                     <= pb.vehicles[v].capacity
                 )
@@ -779,10 +605,10 @@ def add_capacity_constraints(pb: Problem, model: cp_model.CpModel, vars: VarCont
                 # Size limits
                 model.add(
                     sum(
-                        2 * vars.palettes[d, v, trip, c]
-                        + vars.demi_palettes[d, v, trip, c, ProductType.F]
-                        + vars.demi_palettes[d, v, trip, c, ProductType.S]  # type: ignore
+                        vars.delivers[d, v, trip, c, dem]
+                        * pb.demands[c][dem].load_type.size_in_demi_palettes()
                         for c in delivered_centres
+                        for dem in range(len(pb.demands[c]))
                     )
                     <= 2 * pb.vehicles[v].size
                 )
@@ -795,9 +621,13 @@ def add_capacity_constraints(pb: Problem, model: cp_model.CpModel, vars: VarCont
 
 
 def add_duration_constraints(
-    pb: Problem, model: cp_model.CpModel, vars: VarContainer, loose=False
+    pb: Problem,
+    week: DeliveryWeek,
+    model: cp_model.CpModel,
+    vars: VarContainer,
+    loose=False,
 ):
-    delivered_centres = pb.delivered_centres
+    delivered_centres = pb.delivered_centres(week)
     pdr_nodes = pb.pdr_nodes
 
     # Duration constraints
@@ -827,7 +657,9 @@ def add_duration_constraints(
             )
 
 
-def add_specific_requirements(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
+def add_specific_requirements(
+    pb: Problem, week: DeliveryWeek, model: cp_model.CpModel, vars: VarContainer
+):
     """
     Adds a few "hard-coded" constraints
     These are not written in the input files but have been specified by the client
@@ -860,20 +692,21 @@ def add_specific_requirements(pb: Problem, model: cp_model.CpModel, vars: VarCon
         if p != carrefour_menude_index
     )
 
-    # # # Redundant
-    # model.add_bool_and(
-    #     vars.visits[d, v, carrefour_en_jacca_index].negated()
-    #     for d in range(pb.n_days)
-    #     for v in range(pb.m)
-    #     if (d, v, carrefour_en_jacca_index) in vars.visits and (d, v) != (2, 0)
-    # )
-
     # The PL cannot deliver Toulouse/Grande-Bretagne
     index_gde_bretagne = 24
     model.add_bool_and(
         vars.visits[d, 0, trip, index_gde_bretagne].negated()
         for d in range(pb.n_days)
         for trip in range(pb.params.max_trips)
+    )
+
+    # both PLs cannot deliver Escalquens
+    index_escalquens = 8
+    model.add_bool_and(
+        vars.visits[d, v, trip, index_escalquens].negated()
+        for d in range(pb.n_days)
+        for trip in range(pb.params.max_trips)
+        for v in (0, 1)
     )
 
     # Bessières cannot be delivered with camions frigos
@@ -896,21 +729,63 @@ def add_specific_requirements(pb: Problem, model: cp_model.CpModel, vars: VarCon
         if v != 2
     )
 
+    # Fenouillet not too early
+    index_fenouillet = 9
+    # model.add_bool_and(
+    #     vars.arcs[d, v, 0][0, index_fenouillet].negated()
+    #     for d in range(pb.n_days)
+    #     for v in pb.allowed_vehicles
+    # )
+    for d in range(pb.n_days):
+        for v in pb.allowed_vehicles:
+            visits_fenouillet = model.new_bool_var("")
+
+            model.add_bool_and(
+                vars.visits[d, v, trip, index_fenouillet].negated()
+                for trip in range(pb.params.max_trips)
+            ).only_enforce_if(visits_fenouillet.negated())
+
+            model.add(
+                vars.tour_duration[d, v] <= (pb.params.max_tour_duration - 45) * 60
+            ).only_enforce_if(visits_fenouillet)
+
+    # Fronton in first only (they distribute food in the morning)
+    index_fronton = 11
+    model.add_bool_and(
+        vars.arcs[d, v, trip][c, index_fronton].negated()
+        for d in range(pb.n_days)
+        for v in pb.allowed_vehicles
+        for c in pb.delivered_centres(week)
+        if c != index_fronton and c != 0
+        for trip in range(pb.params.max_trips)
+    )
+    model.add_bool_and(
+        vars.arcs[d, v, trip][0, index_fronton].negated()
+        for d in range(pb.n_days)
+        for v in pb.allowed_vehicles
+        for trip in range(1, pb.params.max_trips)
+    )
+
     # "Livraisons de Ramasses" these deliver the food gathered in previous pickups. Only a single delivery can be done each time.
     for d, v, trip, c in pb.livraisons_de_ramasses:
         model.add_bool_and(
             vars.visits[d, v, trip, c2]
             if c2 == c
             else vars.visits[d, v, trip, c2].negated()
-            for c2 in pb.delivered_centres
+            for c2 in pb.delivered_centres(week)
             if (d, v, trip, c2) in vars.visits
         )
-        for t in [ProductType.A, ProductType.F]:
-            model.add(vars.delivers[d, v, trip, c, t] == 0)
+        model.add_bool_and(
+            vars.delivers[d, v, trip, c, i].negated()
+            for i in range(len(pb.demands[c]))
+            if pb.demands[c][i].product_type != ProductType.S
+            or d not in pb.centres[c].allowed_days
+        )
 
 
 def add_domsym_breaking(
     pb: Problem,
+    week: DeliveryWeek,
     model,
     vars: VarContainer,
 ):
@@ -923,11 +798,14 @@ def add_domsym_breaking(
 
         # Visited -> delivery is not 0
         model.add(
-            sum(vars.delivers[d, v, trip, c, t] for t in ProductType) > 0
+            sum(vars.delivers[d, v, trip, c, dem] for dem in range(len(pb.demands[c])))
+            > 0
         ).only_enforce_if(vars.visits[d, v, trip, c])
 
 
-def add_objective(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
+def add_objective(
+    pb: Problem, week: DeliveryWeek, model: cp_model.CpModel, vars: VarContainer
+):
     allowed_vehicles = pb.allowed_vehicles
 
     vars.total_distance = sum(rd for rd in vars.route_dist.values())
@@ -963,18 +841,24 @@ def add_objective(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
     model.minimize(vars.total_costs)
 
 
-def add_decision_strategies(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
-    return
+def add_decision_strategies(
+    pb: Problem, week: DeliveryWeek, model: cp_model.CpModel, vars: VarContainer
+):
+    pass
 
 
-def add_manual_pruning(pb: Problem, model: cp_model.CpModel, vars: VarContainer):
-    model.add(sum(vars.used.values()) <= 8)
-    # model.add(vars.total_distance <= 2_500_000)
+def add_manual_pruning(
+    pb: Problem, week: DeliveryWeek, model: cp_model.CpModel, vars: VarContainer
+):
+    model.add(sum(vars.used.values()) <= 9)
+    # model.add(sum(vars.used.values()) >= 7)
+    # model.add(vars.total_distance <= 2_400_000)
     return
 
 
 def solve_vrp(
     pb: Problem,
+    week: DeliveryWeek,
     hint=None,
     time_limit=None,
     stop_at_first_solution=False,
@@ -991,31 +875,29 @@ def solve_vrp(
     vars = VarContainer()
 
     print("\r[CP-SAT] Creating variables...", end="")
-    create_tour_variables(pb, model, vars, use_all_vehicles)
-    create_load_variables(pb, model, vars)
-    create_duration_variables(pb, model, vars)
+    create_tour_variables(pb, week, model, vars, use_all_vehicles)
+    create_load_variables(pb, week, model, vars)
+    create_duration_variables(pb, week, model, vars)
 
     print("\r[CP-SAT] Adding constraints 0/10        ", end="")
-    add_time_windows(pb, model, vars)
-    add_cover_constraints(pb, model, vars, loose=True)
-    add_duration_constraints(pb, model, vars)
+    add_time_windows(pb, week, model, vars)
+    add_cover_constraints(pb, week, model, vars, loose=False)
+    add_duration_constraints(pb, week, model, vars, loose=False)
 
     print("\r[CP-SAT] Adding constraints 3/10        ", end="")
-    add_load_constraints(pb, model, vars)
-    add_capacity_constraints(pb, model, vars)
-    # add_demand_constraints(pb, model, vars)
-    add_robust_demand_constraints(pb, model, vars)
-    # add_stochastic_demand_constraints(pb, model, vars, percentage=0.6)
+    add_load_constraints(pb, week, model, vars)
+    add_capacity_constraints(pb, week, model, vars)
+    add_demand_constraints(pb, week, model, vars)
 
     print("\r[CP-SAT] Adding constraints 6/10        ", end="")
 
-    add_specific_requirements(pb, model, vars)
-    # add_domsym_breaking(pb, model, vars)
-    # add_decision_strategies(pb, model, vars)
+    add_specific_requirements(pb, week, model, vars)
+    add_domsym_breaking(pb, week, model, vars)
+    add_decision_strategies(pb, week, model, vars)
 
     print("\r[CP-SAT] Adding objective        ", end="")
-    add_objective(pb, model, vars)
-    # add_manual_pruning(pb, model, vars)
+    add_objective(pb, week, model, vars)
+    # add_manual_pruning(pb, week, model, vars)
 
     # Add input file as a hint
     if hint:
@@ -1033,9 +915,9 @@ def solve_vrp(
     if hint and fix_hint:
         solver.parameters.fix_variables_to_their_hinted_value = True
 
-    solver.parameters.num_workers = 16
+    solver.parameters.num_workers = 12
     solver.parameters.use_lns_only = True
-    solver.parameters.diversify_lns_params = True
+    # solver.parameters.diversify_lns_params = True
 
     if time_limit:
         solver.parameters.max_time_in_seconds = time_limit
@@ -1052,12 +934,73 @@ def solve_vrp(
         print("No solution found")
         return status, None
     else:
-        sol = make_solution(pb, vars, solver)
+        # sol = day_lns(pb, week, model, vars, solver)
+        sol = make_solution(pb, week, vars, solver)
         return status, sol
+
+
+def day_lns(
+    pb: Problem,
+    week: DeliveryWeek,
+    model: cp_model.CpModel,
+    vars: VarContainer,
+    solver: cp_model.CpSolver,
+):
+    suboptimal_days = set(range(pb.n_days))
+    obj = solver.objective_value
+    for iteration in range(10):
+        for d in suboptimal_days:
+            print(
+                "[LNS] iteration ",
+                iteration,
+                " obj = ",
+                obj,
+                "unfixing day ",
+                d,
+            )
+
+            # Fix all days except this one
+            new_model = model.clone()
+            for d2 in range(pb.n_days):
+                if d2 == d:
+                    continue
+
+                for v in pb.allowed_vehicles:
+                    for trip in range(pb.params.max_trips):
+                        for n1 in range(pb.n_nodes):
+                            for n2 in range(pb.n_nodes):
+                                if n1 == n2:
+                                    continue
+
+                                new_model.add(
+                                    vars.arcs[d2, v, trip][n1, n2]
+                                    == solver.value(vars.arcs[d2, v, trip][n1, n2])
+                                )
+
+                        # for c in pb.delivered_centres(week):
+                        #     model.add_hint(
+                        #         vars.visits[d2, v, trip, c],
+                        #         solver.value(vars.visits[d2, v, trip, c]),
+                        #     )
+
+            solver = cp_model.CpSolver()
+
+            if iteration % 2 == 0:
+                solver.parameters.use_lns_only = True
+            # solver.parameters.log_search_progress = True
+
+            status = solver.solve(new_model, LogPrinter(vars))
+
+            obj = solver.objective_value
+            if status == cp_model.OPTIMAL:
+                suboptimal_days.remove(d)
+                print("Suboptimal days remaining : ", suboptimal_days)
+                break
 
 
 def solve_day_per_day(
     pb: Problem,
+    week: DeliveryWeek,
 ):
     # Assign each centre to a single day
     for c in range(pb.n_centres):
@@ -1070,7 +1013,7 @@ def solve_day_per_day(
 
         for c in range(pb.n_centres):
             if d not in day_problem.centres[c].allowed_days:
-                match pb.params.week:
+                match week:
                     case DeliveryWeek.ODD:
                         day_problem.centres[c].delivery_week = DeliveryWeek.EVEN
                     case DeliveryWeek.EVEN:
@@ -1078,7 +1021,7 @@ def solve_day_per_day(
         for p in range(pb.n_pdr):
             day_problem.pdrs[p].required_days = {d} & day_problem.pdrs[p].required_days
 
-        status, sol = solve_vrp(day_problem, use_all_vehicles=True)
+        status, sol = solve_vrp(day_problem, week, use_all_vehicles=True)
         if sol:
             solutions.append(sol)
 

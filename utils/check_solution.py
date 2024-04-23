@@ -55,26 +55,27 @@ def check_durations(pb: Problem, sol: Solution):
                 a = b
             # Trip back to depot
             arc_duration = duration(a, 0, tour_duration)
+            tour_duration += arc_duration
 
             if i == 0 and any(stop.type == StopType.Ramasse for stop in trip):
                 assert trip_duration <= pb.params.max_tour_duration_with_pickup
 
                 if trip_duration > 0.8 * pb.params.max_tour_duration_with_pickup:
                     print(
-                        f"[TEST] Warning : trip {d, v} is ~{tour_duration//60:.0f}h{tour_duration%60:.0f}min long :",
+                        f"[TEST] Warning : trip {d, v} is ~{trip_duration//60:.0f}h{trip_duration%60:.0f}min long :",
                         [stop.name for stop in trip],
                     )
 
             if i < len(trips) - 1:
                 tour_duration += pb.params.wait_between_trips
 
-        assert tour_duration <= pb.params.max_tour_duration
-
         if tour_duration > 0.8 * pb.params.max_tour_duration:
             print(
                 f"[TEST] Warning : tour {d, v} is ~{tour_duration//60:.0f}h{tour_duration%60:.0f}min long :",
                 [stop.name for stop in tour],
             )
+
+        assert tour_duration <= pb.params.max_tour_duration
 
 
 def check_load_constraints(pb: Problem, sol: Solution):
@@ -105,9 +106,12 @@ def check_load_constraints(pb: Problem, sol: Solution):
             # Number of A palettes must be int
             assert stop.palettes[0] % 1 == 0
 
+            full, rest = divmod(stop.palettes[1], 1)
+            halves = rest * 2
             assert (
                 2 * stop.delivery[1]
-                <= 2 * stop.palettes[1] * pb.params.demi_palette_capacity
+                <= pb.params.demi_palette_capacity * halves
+                + pb.params.max_palette_capacity * full
             )
 
             # use either palettes, norvegiennes or both but enough of them
@@ -197,6 +201,14 @@ def check_specific_requirements(pb: Problem, sol: Solution):
         for stop in tour
     )
 
+    ### PL can't deliver Escalquens
+    assert not any(
+        stop.name == "ESCALQUENS"
+        for (_, v), tour in sol.tours.items()
+        if v == 0 or v == 1
+        for stop in tour
+    )
+
     ### Bessières can't be delivered with camions frigos (or PL)
     assert not any(
         stop.name == "BESSIERES"
@@ -213,22 +225,43 @@ def check_specific_requirements(pb: Problem, sol: Solution):
         for stop in tour
     )
 
+    ### Fenouillet not too early
+    for (d, v), tour in sol.tours.items():
+        assert (
+            tour[0].name != "FENOUILLET"
+            or sol.tour_durations[d, v] <= (pb.params.max_tour_duration - 45) * 60
+        )
+
+    ### Fronton not too late
+    assert not any(
+        tour[i].name == "FRONTON"
+        for tour in sol.tours.values()
+        for i in range(1, len(tour))
+    )
+
     ### Livraisons de Ramasse are done with no load
-    for d, v, trip, c in pb.livraisons_de_ramasses:
+    for d, _, _, c in pb.livraisons_de_ramasses:
         done = False
-        current_trip = 0
-        for stop in sol.tours[d, v]:
-            if stop.index == 0:
-                current_trip += 1
+        for v in pb.allowed_vehicles:
+            if (d, v) not in sol.tours:
                 continue
 
-            if stop.index == c and current_trip == trip:
-                done = True
-                assert all(d == 0 for d in stop.delivery[:2])
+            current_trip = 0
+            for stop in sol.tours[d, v]:
+                if stop.index == 0:
+                    current_trip += 1
+                    continue
+
+                if stop.index == c:
+                    done = True
+                    done &= all(deliv == 0 for deliv in stop.delivery[:2])
+                    if d not in pb.centres[c].allowed_days:
+                        done &= stop.delivery[2] == 0
+                    if done:
+                        break
+            if done:
                 break
-        if not done:
-            print(d, v, trip, c)
-            print(sol.tours[d, v])
+
         assert done
 
 
@@ -273,29 +306,18 @@ def check_time_window_constraints(pb: Problem, sol: Solution):
 
 
 def check_demand_constraints(pb: Problem, sol: Solution):
-    demands_met = []
-
-    # Check that demands are met for each scenario
-    for scenario in range(len(pb.centres[0].demands)):
-        met = True
-        for c in range(pb.n_centres):
-            if pb.centres[c].delivery_week in (DeliveryWeek.ANY, pb.params.week):
-                deliv = [
-                    stop.delivery
-                    for tour in sol.tours.values()
-                    for stop in tour
-                    if stop.index == c
-                ]
-                for t in ProductType:
-                    if (
-                        sum(d[t.value] for d in deliv)
-                        < pb.centres[c].demands[scenario][t]
-                    ):
-                        met = False
-        demands_met.append(met)
-
-    assert any(demands_met)
-    print(f"[TEST] Demands met in {sum(demands_met)}/{len(demands_met)} scenarios")
+    for c in range(1, pb.n_centres):
+        if pb.centres[c].delivery_week in (DeliveryWeek.ANY, sol.week):
+            deliv = [
+                stop.delivery
+                for tour in sol.tours.values()
+                for stop in tour
+                if stop.index == c
+            ]
+            for t in ProductType:
+                assert sum(d[t.value] for d in deliv) >= sum(
+                    dem.weight for dem in pb.demands[c] if dem.product_type == t
+                ), f"{c} {t}"
 
 
 def check_solution(pb: Problem, sol: Solution):

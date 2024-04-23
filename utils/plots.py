@@ -226,7 +226,7 @@ def make_dashboard(sol: Solution):
     app.run(debug=False)
 
 
-def print_to_txt(sol: Solution, output_file_path):
+def print_to_txt(sol: Solution, output_file_path, display=False):
     """Generates a pretty printed txt version of the solution and prints it to a specified file"""
 
     vehicles = pd.read_excel("data/vehicules.xlsx", index_col=0)
@@ -246,11 +246,8 @@ def print_to_txt(sol: Solution, output_file_path):
         output += f"\n- - - - {jours_map[d].upper()} - - - -\n\n"
         day_tours = {v: tour for (d2, v), tour in sol.tours.items() if d2 == d}
         for v, tour in day_tours.items():
-            if sol.tour_durations_adjusted:
-                est_time = sol.tour_durations_adjusted[d, v]
-            else:
-                est_time = sol.tour_durations[d, v] / 60
-                est_time = f"{est_time//60:.0f}h{est_time%60:.0f}m"
+            est_time = sol.tour_durations[d, v] / 60
+            est_time = f"{est_time//60:.0f}h{est_time%60:.0f}m"
             output += f"\tVéhicule {v} ({vehicle_names[v]}) - est. {est_time}\n"
 
             for stop in tour:
@@ -297,7 +294,8 @@ def print_to_txt(sol: Solution, output_file_path):
     with open(output_file_path, "w") as txt_file:
         txt_file.write(output)
 
-    print(output)
+    if display:
+        print(output)
     print(f"Wrote solution to {output_file_path}")
 
 

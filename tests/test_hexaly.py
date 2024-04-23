@@ -7,8 +7,8 @@ import os
 
 
 @pytest.fixture(params=problem_files, scope="module")
-def solve_instance(request):
-    time_limit = 2
+def solve_instance(request, get_week):
+    time_limit = 3
     tmp_file = "solutions/tmp.json"
     try:
         os.remove(tmp_file)
@@ -19,16 +19,13 @@ def solve_instance(request):
             "localsolver",
             "models/ls_solver.lsp",
             request.param,
+            str(get_week.value),
             "nil",
             tmp_file,
             f"{time_limit}",
         ]
     )
-    yield request.param, tmp_file
-    try:
-        os.remove(tmp_file)
-    except OSError:
-        pass
+    return request.param, tmp_file
 
 
 def test_finds_feasible(solve_instance):
@@ -45,6 +42,11 @@ def test_valid_solution(solve_instance):
     problem = Problem.from_json(problem_file)
     solution = Solution.from_json(solution_file)
     check_solution(problem, solution)
+
+    try:
+        os.remove(solution_file)
+    except OSError:
+        pass
 
 
 # @pytest.mark.parametrize("total_costs", [2000, 1500, 1000, 900, 800, 700, 600])
