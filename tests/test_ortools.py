@@ -43,11 +43,12 @@ def test_finds_feasible(solve_instance):
     assert solution is not None
 
 
-def test_valid_solution(get_problem, solve_instance):
+def test_valid_solution(get_problem, solve_instance, record_property):
     status, solution = solve_instance
     if not solution:
         pytest.skip("no solution")
     check_solution(get_problem, solution)
+    record_property("score", solution.total_costs)
 
 
 # @pytest.mark.parametrize("total_costs", [2000, 1500, 1000, 900, 800, 700, 600])
