@@ -6,6 +6,9 @@ __pycache__/
 .vscode/
 data/DR*
 data/vehicules.xlsx
-data/demands
+data/demands/*
+data/current/*
 problems/*
 !problems/*/
+!*/**/distributions.csv
+!*/**/2602.json

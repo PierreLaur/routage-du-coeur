@@ -5,7 +5,7 @@
     "norvegienne_capacity": 40,
     "max_stops": 4,
     "max_trips": 2,
-    "max_tour_duration": 300,
+    "max_tour_duration": 270,
     "max_tour_duration_with_pickup": 180,
     "wait_at_centres": 30,
     "wait_at_pdrs": 30,

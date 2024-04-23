@@ -731,23 +731,12 @@ def add_specific_requirements(
 
     # Fenouillet not too early
     index_fenouillet = 9
-    # model.add_bool_and(
-    #     vars.arcs[d, v, 0][0, index_fenouillet].negated()
-    #     for d in range(pb.n_days)
-    #     for v in pb.allowed_vehicles
-    # )
     for d in range(pb.n_days):
         for v in pb.allowed_vehicles:
-            visits_fenouillet = model.new_bool_var("")
-
-            model.add_bool_and(
-                vars.visits[d, v, trip, index_fenouillet].negated()
-                for trip in range(pb.params.max_trips)
-            ).only_enforce_if(visits_fenouillet.negated())
-
-            model.add(
-                vars.tour_duration[d, v] <= (pb.params.max_tour_duration - 45) * 60
-            ).only_enforce_if(visits_fenouillet)
+            for trip in range(pb.params.max_trips):
+                model.add(
+                    vars.tour_duration[d, v] <= (pb.params.max_tour_duration - 45) * 60
+                ).only_enforce_if(vars.visits[d, v, trip, index_fenouillet])
 
     # Fronton in first only (they distribute food in the morning)
     index_fronton = 11

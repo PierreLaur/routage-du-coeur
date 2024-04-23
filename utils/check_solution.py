@@ -66,16 +66,28 @@ def check_durations(pb: Problem, sol: Solution):
                         [stop.name for stop in trip],
                     )
 
+            if trip_duration >= 120 * 60:
+                if any(stop.palettes[2] > 0 for stop in trip) and any(
+                    stop.palettes[1] > 0 for stop in trip
+                ):
+                    print(
+                        "[TEST] Warning : long trip with F and S on palettes :",
+                        [stop.name for stop in trip],
+                    )
+
             if i < len(trips) - 1:
                 tour_duration += pb.params.wait_between_trips
 
-        if tour_duration > 0.8 * pb.params.max_tour_duration:
+        if tour_duration > 0.85 * pb.params.max_tour_duration:
             print(
                 f"[TEST] Warning : tour {d, v} is ~{tour_duration//60:.0f}h{tour_duration%60:.0f}min long :",
                 [stop.name for stop in tour],
             )
 
-        assert tour_duration <= pb.params.max_tour_duration
+        if any(stop.name in ["BAGNERES DE LUCHON", "MONTREJEAU"] for stop in tour):
+            assert tour_duration <= pb.params.max_tour_duration + 90 * 60
+        else:
+            assert tour_duration <= pb.params.max_tour_duration
 
 
 def check_load_constraints(pb: Problem, sol: Solution):
