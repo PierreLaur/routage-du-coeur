@@ -17,7 +17,7 @@ problem_files = [
 
 current_problem = "problems/fixe_usual_0226.json"
 example_problem = "problems/fixe_usual_original.json"
-current_solution = "solutions/current_tours/current_problem.json"
+current_solution = "solutions/current_tours/current_0226.json"
 
 
 @pytest.fixture(scope="package")

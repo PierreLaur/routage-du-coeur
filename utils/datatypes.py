@@ -127,7 +127,6 @@ class Vehicle:
 @dataclass
 class Params:
     max_palette_capacity: int
-    demi_palette_capacity: int
     n_norvegiennes: int
     norvegienne_capacity: int
     max_stops: int
@@ -146,7 +145,6 @@ class Params:
     def from_dict(cls, d):
         return cls(
             d["max_palette_capacity"],
-            d["demi_palette_capacity"],
             d["n_norvegiennes"],
             d["norvegienne_capacity"],
             d["max_stops"],
@@ -169,7 +167,7 @@ class StopType(Enum):
 class Stop:
     index: int
     name: str
-    type: StopType
+    stop_type: StopType
     delivery: tuple[int, int, int] = (0, 0, 0)
     palettes: tuple[float, float, float] = (0, 0, 0)
     norvegiennes: int = 0
@@ -178,9 +176,9 @@ class Stop:
         d = {
             "index": self.index,
             "name": self.name,
-            "type": self.type.name,
+            "stop_type": self.stop_type.name,
         }
-        if self.type == StopType.Livraison:
+        if self.stop_type == StopType.Livraison:
             d["delivery"] = self.delivery
             d["palettes"] = self.palettes
             d["norvegiennes"] = self.norvegiennes
@@ -188,7 +186,7 @@ class Stop:
 
     @classmethod
     def from_dict(cls, dict):
-        stoptype = StopType[dict["type"]]
+        stoptype = StopType[dict["stop_type"]]
         stop = cls(
             dict["index"],
             dict["name"],

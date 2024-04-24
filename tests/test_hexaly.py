@@ -19,10 +19,12 @@ def solve_instance(request, get_week):
             "localsolver",
             "models/ls_solver.lsp",
             request.param,
+            "-w",
             str(get_week.value),
-            "nil",
+            "-o",
             tmp_file,
-            f"{time_limit}",
+            "-t",
+            str(time_limit),
         ]
     )
     return request.param, tmp_file
@@ -65,10 +67,10 @@ def test_improves_over_current_solution(record_property):
             "localsolver",
             "models/ls_solver.lsp",
             current_problem,
-            "1",
-            "nil",
+            "-o",
             tmp_file,
-            f"{time_limit}",
+            "-t",
+            str(time_limit),
         ]
     )
 

@@ -47,10 +47,10 @@ def check_durations(pb: Problem, sol: Solution):
                 arc_duration = duration(a, b, tour_duration)
                 tour_duration += arc_duration
                 trip_duration += arc_duration
-                if stop.type == StopType.Livraison:
+                if stop.stop_type == StopType.Livraison:
                     tour_duration += pb.params.wait_at_centres
                     trip_duration += pb.params.wait_at_centres
-                elif stop.type == StopType.Ramasse:
+                elif stop.stop_type == StopType.Ramasse:
                     tour_duration += pb.params.wait_at_pdrs
                     trip_duration += pb.params.wait_at_pdrs
                 a = b
@@ -58,7 +58,7 @@ def check_durations(pb: Problem, sol: Solution):
             arc_duration = duration(a, 0, tour_duration)
             tour_duration += arc_duration
 
-            if i == 0 and any(stop.type == StopType.Ramasse for stop in trip):
+            if i == 0 and any(stop.stop_type == StopType.Ramasse for stop in trip):
                 assert trip_duration <= pb.params.max_tour_duration_with_pickup
 
                 if trip_duration > 0.8 * pb.params.max_tour_duration_with_pickup:
@@ -94,7 +94,7 @@ def check_durations(pb: Problem, sol: Solution):
 def check_load_constraints(pb: Problem, sol: Solution):
     for (_, v), tour in sol.tours.items():
         for stop in tour:
-            if stop.type == StopType.Ramasse:
+            if stop.stop_type == StopType.Ramasse:
                 continue
             # Product type requirements
             assert all(
@@ -119,21 +119,12 @@ def check_load_constraints(pb: Problem, sol: Solution):
             # Number of A palettes must be int
             assert stop.palettes[0] % 1 == 0
 
-            full, rest = divmod(stop.palettes[1], 1)
-            halves = rest * 2
-            assert (
-                2 * stop.delivery[1]
-                <= pb.params.demi_palette_capacity * halves
-                + pb.params.max_palette_capacity * full
-            )
+            assert stop.delivery[1] <= pb.params.max_palette_capacity * stop.palettes[1]
 
             # use either palettes, norvegiennes or both but enough of them
-            full, rest = divmod(stop.palettes[2], 1)
-            halves = rest * 2
             assert (
                 stop.delivery[2]
-                <= pb.params.demi_palette_capacity * halves
-                + pb.params.max_palette_capacity * full
+                <= pb.params.max_palette_capacity * stop.palettes[2]
                 + stop.norvegiennes * pb.params.norvegienne_capacity
             )
 
@@ -147,7 +138,7 @@ def check_capacity_constraints(pb: Problem, sol: Solution):
                 sum(
                     sum(stop.delivery)
                     for stop in trip
-                    if stop.type == StopType.Livraison
+                    if stop.stop_type == StopType.Livraison
                 )
                 <= pb.vehicles[v].capacity
             )
@@ -157,7 +148,7 @@ def check_capacity_constraints(pb: Problem, sol: Solution):
                 sum(
                     pb.pdrs[stop.index - pb.n_centres].weight
                     for stop in trip
-                    if stop.type == StopType.Ramasse
+                    if stop.stop_type == StopType.Ramasse
                 )
                 <= pb.vehicles[v].capacity
             )
@@ -167,14 +158,14 @@ def check_capacity_constraints(pb: Problem, sol: Solution):
                 sum(
                     sum(stop.palettes)
                     for stop in trip
-                    if stop.type == StopType.Livraison
+                    if stop.stop_type == StopType.Livraison
                 )
                 <= pb.vehicles[v].size
             )
 
             # Size limit for pickups (each pickup takes 2 palettes)
             assert (
-                sum(stop.type == StopType.Ramasse for stop in trip) * 2
+                sum(stop.stop_type == StopType.Ramasse for stop in trip) * 2
                 <= pb.vehicles[v].size
             )
 
@@ -202,9 +193,9 @@ def check_specific_requirements(pb: Problem, sol: Solution):
     assert "CARREFOUR LA MENUDE" in [node.name for node in sol.tours[4, 4]]
 
     ### No other pickups
-    assert sum(stop.type == StopType.Ramasse for stop in sol.tours[2, 0]) == 1
-    assert sum(stop.type == StopType.Ramasse for stop in sol.tours[2, 6]) == 1
-    assert sum(stop.type == StopType.Ramasse for stop in sol.tours[4, 4]) == 1
+    assert sum(stop.stop_type == StopType.Ramasse for stop in sol.tours[2, 0]) == 1
+    assert sum(stop.stop_type == StopType.Ramasse for stop in sol.tours[2, 6]) == 1
+    assert sum(stop.stop_type == StopType.Ramasse for stop in sol.tours[4, 4]) == 1
 
     ### PL can't deliver Gde Bretagne
     assert not any(
@@ -307,7 +298,7 @@ def check_time_window_constraints(pb: Problem, sol: Solution):
 
             trip_used = True
 
-            if stop.type == StopType.Livraison:
+            if stop.stop_type == StopType.Livraison:
                 assert (
                     d in pb.centres[stop.index].allowed_days
                     or (d, v, trip, stop.index) in pb.livraisons_de_ramasses

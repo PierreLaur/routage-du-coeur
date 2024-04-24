@@ -24,11 +24,16 @@ def call_hexaly(problem: str, week: int, hint=None, time_limit=None, outfile=Non
         "localsolver",
         "models/ls_solver.lsp",
         problem,
+        "-w",
         str(week),
-        hint if hint else "nil",
-        outfile if outfile else "nil",
-        str(time_limit) if time_limit else "nil",
     ]
+
+    if hint:
+        command += ["-i", hint]
+    if time_limit:
+        command += ["-t", str(time_limit)]
+    if outfile:
+        command += ["-o", outfile]
 
     try:
         subprocess.run(command)
@@ -41,6 +46,21 @@ def call_hexaly(problem: str, week: int, hint=None, time_limit=None, outfile=Non
         except FileNotFoundError:
             solution = None
         return solution
+
+
+def evaluate_flexibility(problem: str, solution: str):
+    command = [
+        "localsolver",
+        "models/ls_solver.lsp",
+        problem,
+        "-f",
+        solution,
+    ]
+
+    try:
+        subprocess.run(command)
+    except KeyboardInterrupt:
+        print("Solve interrupted")
 
 
 if __name__ == "__main__":
@@ -60,10 +80,15 @@ if __name__ == "__main__":
     )
     parser.add_argument("--outfile", type=str, help="desired output file path")
     parser.add_argument("--time_limit", "-t", type=int, help="time limit")
+    parser.add_argument("--evaluate", type=str, help="solution to evaluate")
 
     args = parser.parse_args()
 
     problem = Problem.from_json(args.problem_file)
+
+    if args.evaluate:
+        evaluate_flexibility(args.problem_file, args.evaluate)
+        exit()
 
     if args.solver == "hexaly":
         solution = call_hexaly(

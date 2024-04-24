@@ -16,7 +16,7 @@ def make_dashboard(sol: Solution):
         vehicle_name = vehicle_names[key[1]]
 
         for stop in tour:
-            if stop.type == StopType.Livraison:
+            if stop.stop_type == StopType.Livraison:
                 card_items.append(
                     html.Tr(
                         [
@@ -256,10 +256,10 @@ def print_to_txt(sol: Solution, output_file_path, display=False):
                 name = stop.name
                 if stop.index == 0:
                     name = "    [Retour Dépôt]"
-                elif stop.type == StopType.Ramasse:
+                elif stop.stop_type == StopType.Ramasse:
                     product_types = "Ramasse"
 
-                elif stop.type == StopType.Livraison and all(
+                elif stop.stop_type == StopType.Livraison and all(
                     deliv == 0 for deliv in stop.delivery
                 ):
                     product_types = "Liv. ramasse"

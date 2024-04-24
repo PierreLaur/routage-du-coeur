@@ -359,9 +359,9 @@ class Solution:
                 b = stop.index
                 arc_duration = duration(a, b, tour_duration)
                 tour_duration += arc_duration  # type: ignore
-                if stop.type == StopType.Livraison:
+                if stop.stop_type == StopType.Livraison:
                     tour_duration += pb.params.wait_at_centres * 60
-                elif stop.type == StopType.Ramasse:
+                elif stop.stop_type == StopType.Ramasse:
                     tour_duration += pb.params.wait_at_pdrs * 60
                 a = b
 

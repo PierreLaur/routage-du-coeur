@@ -5,19 +5,7 @@ use localsolver;
 use random;
 use datetime;
 
-function input() {
-
-    problem = json.parse(problem_file) ;
-    params = problem["params"] ;
-    centres = problem["centres"];
-    pdrs = problem["pdrs"];
-    matrix = problem["distance_matrix"];
-    matrix2 = problem["duration_matrix"];
-    vehicles = problem["vehicles"];
-    livraisons_de_ramasses = problem["livraisons_de_ramasses"];
-
-    n_centres = problem["n_centres"];
-
+function make_index_map(centres, n_centres, week) {
     // list variables require 0-based dense indices 
     // drop the depot & any centres that are not delivered this week to achieve that
     // create a map to be able to link new indices to indices in the problem data
@@ -31,32 +19,10 @@ function input() {
         }
     }
 
-    // The number of centres to serve this week
-    n = index_to_centre.count();
+    return index_to_centre;
+}
 
-    m = vehicles.count();
-    n_pdr = pdrs.count();
-    n_nodes = n + n_pdr;
-    n_days = 5;
-    n_trips = params["max_trips"];
-
-    // Adjust the distance & time matrices to the new indices
-    for [node in 0...n_nodes] {
-        node_index = node < n ? index_to_centre[node] : node - n + n_centres ;
-
-        dist_from_depot[node] = matrix[0][node_index] ;
-        time_from_depot[node] = matrix2[0][node_index] ;
-        dist_to_depot[node] = matrix[node_index][0] ;
-        time_to_depot[node] = matrix2[node_index][0] ;
-
-        for [node2 in 0...n_nodes] {
-            node_index2 = node2 < n ? index_to_centre[node2] : node2 - n + n_centres ;
-            
-            dist_matrix[node][node2] = matrix[node_index][node_index2];
-            time_matrix[node][node2] = matrix2[node_index][node_index2];
-        }
-    }
-
+function read_demands(demand_dict, n, index_to_centre) {
     // where is this function :(
     int_to_string = {
         0 : "0",
@@ -95,8 +61,54 @@ function input() {
     // Demands
     for [c in 0...n] {
         centre = index_to_centre[c] ;
-        demands[c] = problem["demands"][int_to_string[centre]];
+        demands[c] = demand_dict[int_to_string[centre]];
     }
+
+    return demands;
+}
+
+function input() {
+
+    problem = json.parse(problem_file) ;
+    params = problem["params"] ;
+    centres = problem["centres"];
+    pdrs = problem["pdrs"];
+    matrix = problem["distance_matrix"];
+    matrix2 = problem["duration_matrix"];
+    vehicles = problem["vehicles"];
+    livraisons_de_ramasses = problem["livraisons_de_ramasses"];
+
+    n_centres = problem["n_centres"];
+
+    index_to_centre = make_index_map(centres, n_centres, week);
+
+    // The number of centres to serve this week
+    n = index_to_centre.count();
+
+    m = vehicles.count();
+    n_pdr = pdrs.count();
+    n_nodes = n + n_pdr;
+    n_days = 5;
+    n_trips = params["max_trips"];
+
+    // Adjust the distance & time matrices to the new indices
+    for [node in 0...n_nodes] {
+        node_index = node < n ? index_to_centre[node] : node - n + n_centres ;
+
+        dist_from_depot[node] = matrix[0][node_index] ;
+        time_from_depot[node] = matrix2[0][node_index] ;
+        dist_to_depot[node] = matrix[node_index][0] ;
+        time_to_depot[node] = matrix2[node_index][0] ;
+
+        for [node2 in 0...n_nodes] {
+            node_index2 = node2 < n ? index_to_centre[node2] : node2 - n + n_centres ;
+            
+            dist_matrix[node][node2] = matrix[node_index][node_index2];
+            time_matrix[node][node2] = matrix2[node_index][node_index2];
+        }
+    }
+
+    demands = read_demands(problem["demands"], n, index_to_centre);
 
     product_types = {"A", "F", "S"};
 
@@ -144,6 +156,7 @@ function input() {
         }
     }
 
+    // Is d, v, trip, c supposed to be a livraison de ramasse ?
     for [d in 0...n_days] {
         for [v in 0...m] {
             for[trip in 0...n_trips] {
@@ -512,12 +525,10 @@ function model() {
 
 
 
-function set_initial_solution(force, specific_vd) {
+function set_initial_solution(solution_file, force, specific_vd) {
     /* Set an initial solution.
     If force == true, add constraints instead to match the initial solution instead.
     Only fix tours of vehicle-days in specific_vd */
-
-    if (initfile == nil) return;
 
     if (specific_vd == nil) {
         fix_vd = {} ;
@@ -527,7 +538,7 @@ function set_initial_solution(force, specific_vd) {
     else 
         fix_vd = specific_vd ;
 
-    tours_init = json.parse(initfile)["tours"];
+    tours_init = json.parse(solution_file)["tours"];
 
     for [d in 0...n_days] {
         for [v in allowed_vehicles] {
@@ -549,6 +560,9 @@ function set_initial_solution(force, specific_vd) {
                     if (force) {
                         constraint n_livraisons[d][v][trip] == 0 ;
                         constraint n_ramasses[d][v][trip] == 0 ;
+                    } else {
+                        livraisons[d][v][trip].value.clear();
+                        ramasses[d][v][trip].value.clear();
                     }
                 }
                 continue;
@@ -567,7 +581,7 @@ function set_initial_solution(force, specific_vd) {
                     continue;
                 }
 
-                if (place["type"] == "Livraison") {
+                if (place["stop_type"] == "Livraison") {
                     index = -1 ;
                     for [c in 0...n] {
                         if (index_to_centre[c] == place["index"]) {
@@ -621,7 +635,10 @@ function fix(percentage) {
         vd_to_fix.add(randgen.next(0, n_days * m)) ;
     }
 
-    set_initial_solution(true, vd_to_fix);
+    
+    if (initfile == nil) return;
+
+    set_initial_solution(initfile, true, vd_to_fix);
 }
 
 function set_current_tours() {
@@ -681,68 +698,81 @@ function set_current_tours() {
     }
 }
 
-function check_solution_robustness(n_runs, sigma) {
-    /*
-    Checks the robustness of the tours provided as input
+function set_same_visits(solution_file) {
 
-    Simulates many demands from the given distribution, then for each one
-    constrains the solution to be almost identical (we can only add products to existing tours, no new stops or tours)
-    Prints how many feasible solutions it finds
-    */
+    tours_init = json.parse(solution_file)["tours"];
 
-    // TODO : make sure this still works if needed
+    recourses = {};
+    for [d in 0...n_days] {
+        for [v in allowed_vehicles] {
 
-    if (initfile == nil) {
-        println("Please enter an input file to check") ;
-        return ;
-    }
+            key = d + ", " + v;
 
-    // this is hardcoded for 1.15 robustness factor
-    for [p in product_types]{
-        for [c in 0...n] {
-            original_demands[c][p] = demands[c][p] * (1/1.15) ;
-        }
-    }
-    rng = random.create() ;
+            if (tours_init[key] == nil) {
+                for [trip in 0...n_trips] {
+                    constraint n_ramasses[d][v][trip] == 0;
+                }
+                recourses.add(sum[trip in 0...n_trips](n_livraisons[d][v][trip]));
+                continue;
+            }
 
-    feasible = 0 ;
-    st = datetime.now() ;
-    for [run in 0...n_runs] {
-        println("Simulating run ", run, "/",n_runs,"... time=",datetime.now()-st,"s feasible=",feasible,"/",run) ;
-        for [p in product_types] {
-            for [c in 0...n] {
-                rand = rng.nextNormal(1, sigma) ;
-                rand = max(1 - 1.5*sigma, rand) ;
-                rand = min(1 + 1.5*sigma, rand) ;
-                demands[c][p] = max(1, ceil(original_demands[c][p] * rand)) ;
+            livraison_init = {};
+            ramasse_init = {};
+            trip = 0;
+            i = 0;
+            j = 0 ;
+            for [place in tours_init[key]] {
+                if (place["index"] == 0) {
+                    recourses.add(max(0, n_livraisons[d][v][trip] - livraison_init.count()));
+                    trip += 1 ;
+                    i = 0 ;
+                    livraison_init = {};
+                    ramasse_init = {};
+                    continue;
+                }
+
+                if (place["stop_type"] == "Livraison") {
+                    index = -1 ;
+                    for [c in 0...n] {
+                        if (index_to_centre[c] == place["index"]) {
+                            index = c ;
+                            break ;
+                        }
+                    }
+                    if (index == -1) {
+                        println("Warning : skipping ", place["name"], " ", place["index"], " in input solution") ;
+                        break ;
+                    }
+
+                    livraison_init.add(index);
+                    constraint or[trip in 0...n_trips](visits_l[d][v][trip][index]);
+                    i += 1 ;
+
+                } else {
+                    ramasse_init.add(place["index"] - n_centres);
+                    constraint ramasses[d][v][trip][j] == place["index"] - n_centres;
+                    constraint visits_r[d][v][trip][place["index"] - n_centres] ;
+                    j += 1;
+                }
+            }
+            recourses.add(max(0, n_livraisons[d][v][trip] - livraison_init.count()));
+            constraint n_ramasses[d][v][trip] == ramasse_init.count();
+
+            for [later_trip in trip+1...n_trips] {
+                recourses.add(n_livraisons[d][v][later_trip]);
+                constraint n_ramasses[d][v][later_trip] == 0;
             }
         }
-
-        with(ls = localsolver.create()) {
-            // ls.addCallback("ITERATION_TICKED", callback);
-
-            model();
-            set_initial_solution(true, nil); // Force the tours to be identical to the given solution
-            ls.model.close();
-            set_initial_solution(false, nil); // Give the given solution as a hint
-            ls.param.timeLimit = 2 ;
-            ls.param.verbosity = 0 ;
-            ls.solve();
-
-            if (ls.solution.status == "FEASIBLE") {
-                feasible += 1 ;
-            }
-        }
     }
 
-    perc_feasible = round(100 * feasible / n_runs) ;
-    println("Percentage of feasible runs : ", perc_feasible, "%") ;
+    return recourses;
+    
 }
 
 
 
-
 function aggregate_tours() {
+    tours = {};
     for [d in 0...n_days] {
         for [v in allowed_vehicles] {
             tours[d][v] = {} ;
@@ -802,7 +832,7 @@ function write_solution() {
                 if (node == -1) {
                     place["index"] = 0 ;
                     place["name"] = centres[0]["name"];
-                    place["type"] = "Livraison";
+                    place["stop_type"] = "Livraison";
                     place["delivery"] = {0,0,0};
                     place["palettes"] = {0,0,0};
                     place["norvegiennes"] = 0;
@@ -810,7 +840,7 @@ function write_solution() {
                 } else if (node < n) {
                     place["index"] = index_to_centre[node];
                     place["name"] = centres[index_to_centre[node]]["name"];
-                    place["type"] = "Livraison";
+                    place["stop_type"] = "Livraison";
                     place["delivery"] = {
                         sum[i in 0...demands[node].count() : demands[node][i]["product_type"] == "A"](demands[node][i]["weight"] * visits_l[d][v][trip][node].value * delivers[d][v][trip][node][i].value),
                         sum[i in 0...demands[node].count() : demands[node][i]["product_type"] == "F"](demands[node][i]["weight"] * visits_l[d][v][trip][node].value * delivers[d][v][trip][node][i].value),
@@ -827,7 +857,7 @@ function write_solution() {
                 } else {
                     place["index"] = node - n + n_centres;
                     place["name"] = pdrs[node - n]["name"];
-                    place["type"] = "Ramasse";
+                    place["stop_type"] = "Ramasse";
                 }
 
                 sol["tours"][key].add(place);
@@ -919,7 +949,7 @@ function solve() {
         }
 
         if (initfile != nil) {
-            set_initial_solution(false, nil);
+            set_initial_solution(initfile, false, nil);
         }
 
         ls.solve();
@@ -927,21 +957,126 @@ function solve() {
     }
 }
 
+function evaluate_flexibility(solution_file) {
+    test_file = "problems/demands/test_demands.json";
+    scenarios = json.parse(test_file);
+
+    summary = {};
+
+    with(ls = localsolver.create()) {
+        ls.param.verbosity = 0 ;
+        model();
+        ls.model.close();
+        set_initial_solution(solution_file, false, nil);
+        tours = aggregate_tours();
+        summary["original_tours"] = tours;
+    }
+
+    sc_index = 0;
+    n_rec = {};
+    for [scenario in scenarios.keys()] {
+        sc_index += 1;
+        print("[EVAL] ", sc_index, "/", scenarios.count(), " ");
+        demands = read_demands(scenarios[scenario], n, index_to_centre);
+
+        with(ls = localsolver.create()) {
+            ls.param.verbosity = 0 ;
+            ls.param.timeLimit = 2 ;
+
+            model();
+
+            recourses = set_same_visits(solution_file);
+
+            n_recourses <- sum[r in recourses](r) ; 
+            minimize n_recourses;
+            constraint n_recourses <= 10;
+
+            ls.model.close();
+            set_initial_solution(solution_file, false, nil);
+
+            ls.solve();
+            print("       ", ls.solution.status);
+
+            summary[scenario]["status"] = ls.solution.status;
+
+            if (ls.solution.status == "OPTIMAL" || ls.solution.status == "FEASIBLE") {
+                print("       cost=", round(ls.model.objectives[0].value));
+                summary[scenario]["total_costs"] = ls.model.objectives[0].value;
+                print("       recourses=", n_recourses.value);
+                summary[scenario]["recourses"] = n_recourses.value;
+                n_rec.add(n_recourses.value);
+                tours = aggregate_tours();
+                summary[scenario]["tours"] = tours;
+            }
+            println();
+        }
+    }
+
+    n_feasible = sum[scenario in scenarios.keys() : summary[scenario]["status"] == "FEASIBLE" || summary[scenario]["status"] == "OPTIMAL"](1);
+    average_cost = sum[scenario in scenarios.keys() : summary[scenario]["status"] == "FEASIBLE" || summary[scenario]["status"] == "OPTIMAL"]
+                            (summary[scenario]["total_costs"]) 
+                    / n_feasible;
+
+    println("Feasible: ", n_feasible, "/", scenarios.count());
+    println("Average cost: ", round(average_cost), "E");
+    println("Recourses: ", n_rec);
+
+    json.dump(summary, "solutions/flexibility/summary.json");
+}
 
 
-function main(args) {
-
-    usage = "Usage: ls_solver problem_file week (initsol | 'nil') (outfile | 'nil') [timelimit]";
-    if (args.count() < 2) {
+function parse_args(args) {
+    usage = "Usage: ls_solver problem_file -w week -i initsol -o outfile -t timelimit -f eval_file";
+    n_args = args.count();
+    if (n_args == 0) {
         throw usage;
     }
 
-    problem_file = args[0];
-    week = args[1].toInt();
-    initfile = args[2] == "nil" || args.count() < 3 ? nil : args[2];
-    outfile = args[3] == "nil"  || args.count() < 4 ? nil : args[3];
-    timelimit = args[4] == "nil" || args.count() < 5 ? nil : args[4].toInt();
+    try {
+        problem_file = args[0];
+
+        i = 1;
+        while (i < n_args) {
+            arg = args[i];
+            if (arg == "-w") {
+                i += 1;
+                week = args[i].toInt();
+            } else if (arg == "-i") {
+                i += 1;
+                initfile = args[i];
+            } else if (arg == "-o") {
+                i += 1;
+                outfile = args[i];
+            } else if (arg == "-t") {
+                i += 1;
+                timelimit = args[i].toInt();
+            } else if (arg == "-f") {
+                i += 1;
+                eval_file = args[i];
+            } else {
+                println("Unknown argument: ", arg);
+                throw usage;
+            }
+
+            if (i == n_args) {
+                throw usage;
+            }
+
+            i += 1;
+        }
+    } catch(e) {
+        throw usage;
+    }
+    
     improvement_limit = nil;
+    if (week == nil) {
+        week = 1;
+    }
+}
+
+function main(args) {
+
+    parse_args(args);
 
     input();
 
@@ -951,6 +1086,22 @@ function main(args) {
     lastSolutionWritten = false;
     lastObjectiveValue = inf - 1;
 
-    solve();
-    // solve_multi(10, 10);
+    if (eval_file != nil) {
+        println("Evaluating file ", eval_file, " for problem ", problem_file);
+        evaluate_flexibility(eval_file);
+    } else {
+        println("Solving file ", problem_file, " for week ", week);
+        if (initfile != nil) {
+            println("   with initsol : ", initfile);
+        }
+        if (outfile != nil) {
+            println("   with outfile : ", outfile);
+        }
+        if (timelimit != nil) {
+            println("   with time limit : ", timelimit, " seconds");
+        }
+
+        solve();
+        // solve_multi(10, 10);
+    }
 }
