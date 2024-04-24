@@ -98,12 +98,6 @@ function input() {
         demands[c] = problem["demands"][int_to_string[centre]];
     }
 
-    num_palettes = {
-        "PALETTE" : 1,
-        "DEMI_PALETTE" : 0.5,
-        "NORVEGIENNE" : 0
-    };
-
     product_types = {"A", "F", "S"};
 
     allowed_vehicles = {};
@@ -192,7 +186,7 @@ function create_variables() {
                         can_deliver = can_deliver && can_carry[v][demand["product_type"]];
                         if (
                             demand["product_type"] == "S"
-                            && demand["load_type"] == "DEMI_PALETTE"
+                            && demand["palettes"] > 0
                             && !vehicles[v]["allows_isotherm_cover"]
                         ) {
                             can_deliver = false;
@@ -239,9 +233,9 @@ function create_variables() {
                     load[d][v][trip][c] <- !visits_l[d][v][trip][c] ? 0 : sum[i in 0...demands[c].count()]
                                                 (delivers[d][v][trip][c][i] * demands[c][i]["weight"]);
                     palettes[d][v][trip][c] <-  visits_l[d][v][trip][c] * sum[i in 0...demands[c].count()]
-                                                (delivers[d][v][trip][c][i] * num_palettes[demands[c][i]["load_type"]]);
-                    norvegiennes[d][v][trip][c] <- visits_l[d][v][trip][c] * sum[i in 0...demands[c].count() : demands[c][i]["load_type"] == "NORVEGIENNE"]
-                                                (delivers[d][v][trip][c][i]);
+                                                (delivers[d][v][trip][c][i] * demands[c][i]["palettes"]);
+                    norvegiennes[d][v][trip][c] <- visits_l[d][v][trip][c] * sum[i in 0...demands[c].count()]
+                                                (delivers[d][v][trip][c][i] * demands[c][i]["norvegiennes"]);
                 } 
             }
         }
@@ -485,7 +479,7 @@ function add_demand_constraints() {
         for [i in 0...demands[c].count()] {
             // constraint xor[d in 0...n_days : delivery_allowed[d][c]][v in allowed_vehicles][trip in 0...n_trips]
             //         (visits_l[d][v][trip][c] && delivers[d][v][trip][c][i]);
-            constraint sum[d in 0...n_days : delivery_allowed[d][c]][v in allowed_vehicles][trip in 0...n_trips : !is_ldr[d][v][trip][c]]
+            constraint sum[d in 0...n_days : delivery_allowed[d][c]][v in allowed_vehicles][trip in 0...n_trips]
                 (visits_l[d][v][trip][c] * delivers[d][v][trip][c][i]) == 1;
         }
     }
@@ -501,7 +495,7 @@ function add_objectives() {
     total_distance <- sum[d in 0...n_days][v in allowed_vehicles][trip in 0...n_trips](route_dist[d][v][trip]);
 
     // constraint total_costs <= 900 ;
-    constraint n_used <= 9 ;
+    // constraint n_used <= 9 ;
     minimize total_costs ;
 }
 
@@ -673,8 +667,16 @@ function set_current_tours() {
                     }
                 }
             }
-            constraint n_livraisons[d][v][trip] == i;
-            constraint n_ramasses[d][v][trip] == j;
+
+            if (trip < n_trips) {
+                constraint n_livraisons[d][v][trip] == i;
+                constraint n_ramasses[d][v][trip] == j;
+            }
+
+            for [later_trips in trip+1...n_trips] {
+                constraint n_livraisons[d][v][later_trips] == 0;
+                constraint n_ramasses[d][v][later_trips] == 0;
+            }
         }
     }
 }
@@ -816,12 +818,12 @@ function write_solution() {
                     };
 
                     place["palettes"] = {
-                        sum[i in 0...demands[node].count() : demands[node][i]["product_type"] == "A"](num_palettes[demands[node][i]["load_type"]] * visits_l[d][v][trip][node].value * delivers[d][v][trip][node][i].value),
-                        sum[i in 0...demands[node].count() : demands[node][i]["product_type"] == "F"](num_palettes[demands[node][i]["load_type"]] * visits_l[d][v][trip][node].value * delivers[d][v][trip][node][i].value),
-                        sum[i in 0...demands[node].count() : demands[node][i]["product_type"] == "S"](num_palettes[demands[node][i]["load_type"]] * visits_l[d][v][trip][node].value * delivers[d][v][trip][node][i].value)
+                        sum[i in 0...demands[node].count() : demands[node][i]["product_type"] == "A"](demands[node][i]["palettes"] * visits_l[d][v][trip][node].value * delivers[d][v][trip][node][i].value),
+                        sum[i in 0...demands[node].count() : demands[node][i]["product_type"] == "F"](demands[node][i]["palettes"] * visits_l[d][v][trip][node].value * delivers[d][v][trip][node][i].value),
+                        sum[i in 0...demands[node].count() : demands[node][i]["product_type"] == "S"](demands[node][i]["palettes"] * visits_l[d][v][trip][node].value * delivers[d][v][trip][node][i].value)
                     };
 
-                    place["norvegiennes"] = sum[i in 0...demands[node].count() : demands[node][i]["load_type"] == "NORVEGIENNE"](visits_l[d][v][trip][node].value * delivers[d][v][trip][node][i].value);
+                    place["norvegiennes"] = sum[i in 0...demands[node].count()](demands[node][i]["norvegiennes"] * visits_l[d][v][trip][node].value * delivers[d][v][trip][node][i].value);
                 } else {
                     place["index"] = node - n + n_centres;
                     place["name"] = pdrs[node - n]["name"];
@@ -902,10 +904,11 @@ function solve() {
         ls.addCallback("ITERATION_TICKED", callback);
         ls.param.verbosity = 0 ;
         ls.param.seed = random.create().next(0, 10000);
-        // ls.param.verbosity = 2 ;
 
         model();
+        
         // set_current_tours();
+
         // Force the solution to match the input solution
         // set_initial_solution(true, nil);
 

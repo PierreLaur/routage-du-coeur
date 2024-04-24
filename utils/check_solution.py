@@ -1,4 +1,5 @@
 import argparse
+from collections import defaultdict
 from utils.problem import Problem, Solution, ProductType, DeliveryWeek, StopType, Stop
 from numpy import int64
 
@@ -291,6 +292,7 @@ def check_time_window_constraints(pb: Problem, sol: Solution):
 
             assert n_visits == (d in pb.pdrs[p].required_days)
 
+    n_visits = defaultdict(int)
     # Don't visit outside of allowed/required days
     for (d, v), tour in sol.tours.items():
         trip = 0
@@ -310,11 +312,17 @@ def check_time_window_constraints(pb: Problem, sol: Solution):
                     d in pb.centres[stop.index].allowed_days
                     or (d, v, trip, stop.index) in pb.livraisons_de_ramasses
                 )
+                if (d, v, trip, stop.index) not in pb.livraisons_de_ramasses:
+                    n_visits[stop.index] += 1
             else:
                 assert d in pb.pdrs[stop.index - pb.n_centres].required_days
 
                 # No pickups outside of first trip
                 assert trip == 0
+
+    for c, n_vis in n_visits.items():
+        if n_vis > 3:
+            print(f"[TEST] Warning : {pb.centres[c].name} is visited {n_vis} times")
 
 
 def check_demand_constraints(pb: Problem, sol: Solution):

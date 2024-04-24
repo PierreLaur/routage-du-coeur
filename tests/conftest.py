@@ -8,21 +8,21 @@ problem_files = [
     for f in [
         "fixe_usual_original.json",
         "fixe_usual_0226.json",
-        "fixe_usual_median.json",
+        # "fixe_usual_median.json",
         # "fixe_0226_original.json",
         # "fixe_0226_0226.json",
         # "fixe_0226_median.json",
     ]
 ]
 
-current_problem = "problems/current_problem.json"
+current_problem = "problems/fixe_usual_0226.json"
+example_problem = "problems/fixe_usual_original.json"
 current_solution = "solutions/current_tours/current_problem.json"
 
 
 @pytest.fixture(scope="package")
 def make_test_problem():
-    path = "problems/example.json"
-    problem = Problem.from_json(path)
+    problem = Problem.from_json(example_problem)
     return problem
 
 

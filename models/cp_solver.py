@@ -2,7 +2,6 @@ import json
 from ortools.sat.python import cp_model
 from math import inf, ceil
 from utils.datatypes import (
-    LoadType,
     DeliveryWeek,
     ProductType,
     Stop,
@@ -264,32 +263,25 @@ def make_solution(
 
                 stop.palettes = (
                     sum(
-                        delivers[d, v, trip, node, dem]
-                        * pb.demands[node][dem].load_type.size_in_demi_palettes()
+                        delivers[d, v, trip, node, dem] * pb.demands[node][dem].palettes
                         for dem in range(len(pb.demands[node]))
                         if pb.demands[node][dem].product_type == ProductType.A
-                    )
-                    // 2,
-                    0.5
-                    * sum(
-                        delivers[d, v, trip, node, dem]
-                        * pb.demands[node][dem].load_type.size_in_demi_palettes()
+                    ),
+                    sum(
+                        delivers[d, v, trip, node, dem] * pb.demands[node][dem].palettes
                         for dem in range(len(pb.demands[node]))
                         if pb.demands[node][dem].product_type == ProductType.F
                     ),
-                    0.5
-                    * sum(
-                        delivers[d, v, trip, node, dem]
-                        * pb.demands[node][dem].load_type.size_in_demi_palettes()
+                    sum(
+                        delivers[d, v, trip, node, dem] * pb.demands[node][dem].palettes
                         for dem in range(len(pb.demands[node]))
                         if pb.demands[node][dem].product_type == ProductType.S
                     ),
                 )
 
                 stop.norvegiennes = sum(
-                    delivers[d, v, trip, node, dem]
+                    delivers[d, v, trip, node, dem] * pb.demands[node][dem].norvegiennes
                     for dem in range(len(pb.demands[node]))
-                    if pb.demands[node][dem].load_type == LoadType.NORVEGIENNE
                 )
 
             t.append(stop)
@@ -409,7 +401,7 @@ def create_load_variables(
                             can_deliver = False
                         if (
                             demand.product_type == ProductType.S
-                            and demand.load_type == LoadType.DEMI_PALETTE
+                            and demand.palettes > 0
                             and not pb.vehicles[v].allows_isotherm_cover
                         ):
                             can_deliver = False
@@ -571,12 +563,11 @@ def add_capacity_constraints(
     for d in range(pb.n_days):
         model.add(
             sum(
-                vars.delivers[d, v, trip, c, dem]
+                vars.delivers[d, v, trip, c, dem] * pb.demands[c][dem].norvegiennes
                 for v in allowed_vehicles
                 for trip in range(pb.params.max_trips)
                 for c in delivered_centres
                 for dem in range(len(pb.demands[c]))
-                if pb.demands[c][dem].load_type == LoadType.NORVEGIENNE
             )
             <= pb.params.n_norvegiennes
         )
@@ -606,7 +597,7 @@ def add_capacity_constraints(
                 model.add(
                     sum(
                         vars.delivers[d, v, trip, c, dem]
-                        * pb.demands[c][dem].load_type.size_in_demi_palettes()
+                        * int(2 * pb.demands[c][dem].palettes)
                         for c in delivered_centres
                         for dem in range(len(pb.demands[c]))
                     )

@@ -14,37 +14,25 @@ class DeliveryWeek(Enum):
     EVEN = 2
 
 
-class LoadType(Enum):
-    PALETTE = 0
-    DEMI_PALETTE = 1
-    NORVEGIENNE = 2
-
-    def size_in_demi_palettes(self):
-        match self:
-            case LoadType.PALETTE:
-                return 2
-            case LoadType.DEMI_PALETTE:
-                return 1
-            case LoadType.NORVEGIENNE:
-                return 0
-
-
 @dataclass
 class Demand:
     weight: int
-    load_type: LoadType
+    palettes: float
+    norvegiennes: int
     product_type: ProductType
 
     def to_dict(self):
         d = asdict(self)
-        d["load_type"] = self.load_type.name
         d["product_type"] = self.product_type.name
         return d
 
     @classmethod
     def from_dict(cls, d):
         return cls(
-            d["weight"], LoadType[d["load_type"]], ProductType[d["product_type"]]
+            d["weight"],
+            d["palettes"],
+            d["norvegiennes"],
+            ProductType[d["product_type"]],
         )
 
 
@@ -183,7 +171,7 @@ class Stop:
     name: str
     type: StopType
     delivery: tuple[int, int, int] = (0, 0, 0)
-    palettes: tuple[int, float, float] = (0, 0, 0)
+    palettes: tuple[float, float, float] = (0, 0, 0)
     norvegiennes: int = 0
 
     def to_dict(self):
