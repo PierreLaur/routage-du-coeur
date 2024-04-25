@@ -1,9 +1,12 @@
 from collections import defaultdict
 import json
 from math import ceil
-import os
+import sys
+import numpy as np
 import pandas as pd
 from utils.datatypes import Demand, Params, ProductType
+from numpy.random import Generator, PCG64
+from enum import Enum
 
 frais_sur_demi_palettes = [
     "L ISLE EN DODON",
@@ -19,13 +22,55 @@ frais_sur_demi_palettes = [
 ]
 
 
-def prepare_demands(demands_file: str, params: Params):
-    demands_df = pd.read_excel(demands_file, index_col=0)
+class PalettePolicy(Enum):
+    MAX = 0
+    RANDOM = 1
+
+
+def generate_weights(n_instances: int):
+    distributions = pd.read_csv("data/demands/distributions.csv", index_col=0)
+    rng = Generator(PCG64())
+    n_centres = distributions.index.unique().shape[0]
+
+    instances = np.zeros((n_instances, n_centres, 3))
+    for centre in range(n_centres):
+        for product in range(3):
+            a, b, c = distributions.iloc[centre * 3 + product, 1:]
+            if a == c:
+                instances[:, centre, product] = a
+            else:
+                instances[:, centre, product] = rng.triangular(
+                    a,
+                    b,
+                    c,
+                    n_instances,
+                )
+    instances = np.ceil(instances).astype(int)
+    return [
+        pd.DataFrame(
+            instances[i], index=distributions.index.unique(), columns=["A", "F", "S"]
+        )
+        for i in range(n_instances)
+    ]
+
+
+def palette_weight(
+    quantity: int, capacity: int, policy: PalettePolicy = PalettePolicy.RANDOM
+) -> int:
+    if policy == PalettePolicy.RANDOM:
+        capacity = ceil(np.random.uniform(capacity * 0.8, capacity))
+
+    weight = min(quantity, capacity)
+    return weight
+
+
+def prepare_demands(demands_df: pd.DataFrame, params: Params, max=False):
+    policy = PalettePolicy.MAX if max else PalettePolicy.RANDOM
     demands: dict[int, list[Demand]] = defaultdict(list)
     for c, (index, row) in enumerate(demands_df.iterrows()):
         weight_A = ceil(row["A"])
         while weight_A > 0:
-            new_weight = min(weight_A, params.max_palette_capacity)
+            new_weight = palette_weight(weight_A, params.max_palette_capacity, policy)
             weight_A -= new_weight
             new_demand = Demand(new_weight, 1, 0, ProductType.A)
             demands[c].append(new_demand)
@@ -33,11 +78,15 @@ def prepare_demands(demands_file: str, params: Params):
         weight_F = ceil(row["F"])
         while weight_F > 0:
             if weight_F > 0.5 * params.max_palette_capacity:
-                new_weight = min(weight_F, ceil(params.max_palette_capacity / 2))
+                new_weight = palette_weight(
+                    weight_F, params.max_palette_capacity // 2, policy
+                )
                 palettes = 1
                 weight_F -= new_weight
             else:
-                new_weight = min(weight_F, ceil(0.5 * params.max_palette_capacity / 2))
+                new_weight = palette_weight(
+                    weight_F, params.max_palette_capacity // 4, policy
+                )
                 palettes = 0.5
                 weight_F -= new_weight
 
@@ -48,14 +97,18 @@ def prepare_demands(demands_file: str, params: Params):
         if weight_S <= 120 or index == "BESSIERES":
             # use norvegiennes
             while weight_S > 0:
-                new_weight = min(weight_S, params.norvegienne_capacity)
+                new_weight = palette_weight(
+                    weight_S, params.norvegienne_capacity, policy
+                )
                 weight_S -= new_weight
                 new_demand = Demand(new_weight, 0, 1, ProductType.S)
                 demands[c].append(new_demand)
         else:
             # use demi-palettes
             while weight_S > 0:
-                new_weight = min(weight_S, params.max_palette_capacity // 2)
+                new_weight = palette_weight(
+                    weight_S, params.max_palette_capacity // 2, policy
+                )
                 weight_S -= new_weight
                 new_demand = Demand(new_weight, 0.5, 0, ProductType.S)
                 demands[c].append(new_demand)
@@ -63,8 +116,7 @@ def prepare_demands(demands_file: str, params: Params):
     return demands
 
 
-def prepare_demands_no_split(demands_file: str, params: Params):
-    demands_df = pd.read_excel(demands_file, index_col=0)
+def prepare_demands_max_no_split(demands_df: pd.DataFrame, params: Params):
     demands: dict[int, list[Demand]] = defaultdict(list)
     for c, (index, row) in enumerate(demands_df.iterrows()):
         weight = ceil(row["A"])
@@ -106,26 +158,15 @@ def prepare_demands_no_split(demands_file: str, params: Params):
 
 
 if __name__ == "__main__":
-    demand_files = [
-        file for file in os.listdir("problems/demands") if file.endswith(".xlsx")
-    ]
+    n_instances = int(sys.argv[1])
 
     params = Params.from_dict(json.load(open("data/params.json")))
 
     scenarios = {}
 
-    for file in demand_files:
-        name = file.split(".")[0]
-        demands = prepare_demands_no_split(
-            os.path.join("problems/demands", file), params
-        )
-        scenarios[name + "_no_split"] = {
-            k: [d.to_dict() for d in demands[k]] for k in demands
-        }
-
-        demands = prepare_demands(os.path.join("problems/demands", file), params)
-        scenarios[name + "_split"] = {
-            k: [d.to_dict() for d in demands[k]] for k in demands
-        }
+    weights = generate_weights(n_instances)
+    for i in range(n_instances):
+        demands = prepare_demands(weights[i], params)
+        scenarios[i] = {k: [d.to_dict() for d in demands[k]] for k in demands}
 
     json.dump(scenarios, open("problems/demands/test_demands.json", "w"))

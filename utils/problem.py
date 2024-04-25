@@ -2,7 +2,7 @@ from dataclasses import dataclass
 import json
 import pandas as pd
 from math import ceil
-from utils.prepare_demands import prepare_demands, prepare_demands_no_split  # noqa: F401
+from utils.prepare_demands import prepare_demands
 from utils.datatypes import (
     DeliveryWeek,
     ProductType,
@@ -179,8 +179,8 @@ class Problem:
             set(map(lambda x: jours_map[x], j)) for j in jours_de_livraison
         ]
 
-        # demands = prepare_demands(demands_file, params)
-        demands = prepare_demands_no_split(demands_file, params)
+        demands = prepare_demands(demands_df, params)
+        # demands = prepare_demands_no_split(demands_file, params)
 
         centres = [
             Centre(

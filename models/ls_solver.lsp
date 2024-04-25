@@ -510,6 +510,13 @@ function add_objectives() {
     // constraint total_costs <= 900 ;
     // constraint n_used <= 9 ;
     minimize total_costs ;
+
+    add_robustness_cuts();
+}
+
+function add_robustness_cuts() {
+    constraint n_used >= 9;
+    constraint used[1];
 }
 
 function model() {
@@ -520,9 +527,7 @@ function model() {
     add_cover_constraints();
     add_specific_requirements() ;
     add_demand_constraints();
-    add_objectives();
 }
-
 
 
 function set_initial_solution(solution_file, force, specific_vd) {
@@ -700,7 +705,8 @@ function set_current_tours() {
 
 function set_same_visits(solution_file) {
 
-    tours_init = json.parse(solution_file)["tours"];
+    solution = json.parse(solution_file);
+    tours_init = solution["tours"];
 
     recourses = {};
     for [d in 0...n_days] {
@@ -723,7 +729,8 @@ function set_same_visits(solution_file) {
             j = 0 ;
             for [place in tours_init[key]] {
                 if (place["index"] == 0) {
-                    recourses.add(max(0, n_livraisons[d][v][trip] - livraison_init.count()));
+                    liv_diff <- n_livraisons[d][v][trip] - livraison_init.count();
+                    recourses.add(liv_diff > 0 ? liv_diff : 0);
                     trip += 1 ;
                     i = 0 ;
                     livraison_init = {};
@@ -755,7 +762,8 @@ function set_same_visits(solution_file) {
                     j += 1;
                 }
             }
-            recourses.add(max(0, n_livraisons[d][v][trip] - livraison_init.count()));
+            liv_diff <- n_livraisons[d][v][trip] - livraison_init.count();
+            recourses.add(liv_diff > 0 ? liv_diff : 0);
             constraint n_ramasses[d][v][trip] == ramasse_init.count();
 
             for [later_trip in trip+1...n_trips] {
@@ -920,6 +928,7 @@ function solve_multi(num_tries, time_limit) {
             ls.param.verbosity = 0 ;
             ls.param.seed = random.create().next(0, 10000);
             model();
+            add_objectives();
             ls.model.close();
             ls.solve();
             ls.model.open();
@@ -936,6 +945,7 @@ function solve() {
         ls.param.seed = random.create().next(0, 10000);
 
         model();
+        add_objectives();
         
         // set_current_tours();
 
@@ -966,6 +976,7 @@ function evaluate_flexibility(solution_file) {
     with(ls = localsolver.create()) {
         ls.param.verbosity = 0 ;
         model();
+        add_objectives();
         ls.model.close();
         set_initial_solution(solution_file, false, nil);
         tours = aggregate_tours();
@@ -981,7 +992,7 @@ function evaluate_flexibility(solution_file) {
 
         with(ls = localsolver.create()) {
             ls.param.verbosity = 0 ;
-            ls.param.timeLimit = 2 ;
+            ls.param.timeLimit = 3 ;
 
             model();
 
@@ -989,7 +1000,12 @@ function evaluate_flexibility(solution_file) {
 
             n_recourses <- sum[r in recourses](r) ; 
             minimize n_recourses;
-            constraint n_recourses <= 10;
+
+            add_objectives();
+            for [v in allowed_vehicles] {
+                constraint used[v] == solution["vehicles_used"][v];
+            }
+            // constraint n_recourses <= 4;
 
             ls.model.close();
             set_initial_solution(solution_file, false, nil);
@@ -1000,8 +1016,8 @@ function evaluate_flexibility(solution_file) {
             summary[scenario]["status"] = ls.solution.status;
 
             if (ls.solution.status == "OPTIMAL" || ls.solution.status == "FEASIBLE") {
-                print("       cost=", round(ls.model.objectives[0].value));
-                summary[scenario]["total_costs"] = ls.model.objectives[0].value;
+                print("       cost=", round(total_costs.value));
+                summary[scenario]["total_costs"] = total_costs.value;
                 print("       recourses=", n_recourses.value);
                 summary[scenario]["recourses"] = n_recourses.value;
                 n_rec.add(n_recourses.value);
@@ -1026,7 +1042,7 @@ function evaluate_flexibility(solution_file) {
 
 
 function parse_args(args) {
-    usage = "Usage: ls_solver problem_file -w week -i initsol -o outfile -t timelimit -f eval_file";
+    usage = "Usage: ls_solver problem_file -w week -i initsol -o outfile -t timelimit -e eval_file";
     n_args = args.count();
     if (n_args == 0) {
         throw usage;
@@ -1050,7 +1066,7 @@ function parse_args(args) {
             } else if (arg == "-t") {
                 i += 1;
                 timelimit = args[i].toInt();
-            } else if (arg == "-f") {
+            } else if (arg == "-e") {
                 i += 1;
                 eval_file = args[i];
             } else {

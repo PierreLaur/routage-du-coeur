@@ -1,9 +1,11 @@
+import os
 from utils.check_solution import check_solution
 from utils.plots import print_to_txt
 from utils.problem import DeliveryWeek, Problem, Solution
 from models.cp_solver import solve_day_per_day, solve_vrp  # noqa: F401
 import argparse
 import subprocess
+from utils.evaluate_flexibility import evaluate_flexibility
 
 
 def call_ortools(
@@ -48,21 +50,6 @@ def call_hexaly(problem: str, week: int, hint=None, time_limit=None, outfile=Non
         return solution
 
 
-def evaluate_flexibility(problem: str, solution: str):
-    command = [
-        "localsolver",
-        "models/ls_solver.lsp",
-        problem,
-        "-f",
-        solution,
-    ]
-
-    try:
-        subprocess.run(command)
-    except KeyboardInterrupt:
-        print("Solve interrupted")
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
@@ -73,22 +60,32 @@ if __name__ == "__main__":
         "--solver", "-s", type=str, help="solver (hexaly/ortools)", default="ortools"
     )
     parser.add_argument(
-        "--week", type=int, help="week (1 or 2 for ODD/EVEN)", default=1
+        "--week", "-w", type=int, help="week (1 or 2 for ODD/EVEN)", default=1
     )
     parser.add_argument(
-        "--initsol", type=str, help="init solution (json solution file)"
+        "--initsol", "-i", type=str, help="init solution (json solution file)"
     )
-    parser.add_argument("--outfile", type=str, help="desired output file path")
+    parser.add_argument("--outfile", "-o", type=str, help="desired output file path")
     parser.add_argument("--time_limit", "-t", type=int, help="time limit")
-    parser.add_argument("--evaluate", type=str, help="solution to evaluate")
+    parser.add_argument(
+        "--evaluate",
+        "-e",
+        help="whether to evaluate the flexibility of the solution",
+        action="store_true",
+    )
 
     args = parser.parse_args()
 
     problem = Problem.from_json(args.problem_file)
 
+    temp_file = "solutions/tmp.json"
     if args.evaluate:
-        evaluate_flexibility(args.problem_file, args.evaluate)
-        exit()
+        outfile = temp_file
+    else:
+        outfile = None
+
+    if args.outfile:
+        outfile = args.outfile
 
     if args.solver == "hexaly":
         solution = call_hexaly(
@@ -96,7 +93,7 @@ if __name__ == "__main__":
             args.week,
             hint=args.initsol,
             time_limit=args.time_limit,
-            outfile=args.outfile,
+            outfile=outfile,
         )
     elif args.solver == "ortools":
         if args.initsol:
@@ -119,7 +116,19 @@ if __name__ == "__main__":
         print("[TEST] No constraint violations detected - the solution is valid.")
     else:
         print("No solution found")
+        exit()
 
-    if args.outfile and solution:
-        solution.to_json(args.outfile)
+    if outfile:
+        solution.to_json(outfile)
+
+    if args.outfile:
         print_to_txt(solution, args.outfile.split(".json")[0] + ".txt")
+
+    if args.evaluate:
+        evaluate_flexibility(args.problem_file, outfile)
+
+        if not args.outfile:
+            try:
+                os.remove(temp_file)
+            except FileNotFoundError:
+                pass
