@@ -335,6 +335,13 @@ function add_specific_requirements() {
             }
         }
     }
+
+    // Leclerc Rouffiac with camions frigos except on Tuesdays
+    index_lc_rouffiac = 4;
+    for [d in 0...n_days : d != 1] {
+        constraint and[v in allowed_vehicles : !can_carry[v]["F"]]
+            (!visits_r[d][v][0][index_lc_rouffiac]);
+    }
 }
 
 function add_time_windows() {
@@ -371,7 +378,7 @@ function add_capacity_constraints() {
                 constraint sum[p in 0...n_pdr : pickup_d_p[d][p]](pdrs[p]["weight"] * visits_r[d][v][trip][p]) <= vehicles[v]["capacity"];
                 
                 // We assume 2 palettes are used for each pickup
-                constraint sum[p in 0...n_pdr : pickup_d_p[d][p]](2 * visits_r[d][v][trip][p]) <= vehicles[v]["size"] ;
+                constraint sum[p in 0...n_pdr : pickup_d_p[d][p]](pdrs[p]["palettes"] * visits_r[d][v][trip][p]) <= vehicles[v]["size"] ;
             }
         }
         constraint sum[c in 0...n : delivery_allowed[d][c]][v in allowed_vehicles]
@@ -511,7 +518,7 @@ function add_objectives() {
     // constraint n_used <= 9 ;
     minimize total_costs ;
 
-    add_robustness_cuts();
+    // add_robustness_cuts();
 }
 
 function add_robustness_cuts() {
@@ -530,28 +537,29 @@ function model() {
 }
 
 
-function set_initial_solution(solution_file, force, specific_vd) {
-    /* Set an initial solution.
+function set_initial_solution(solution_file, force, days) {
+    /* 
+    Set an initial solution.
     If force == true, add constraints instead to match the initial solution instead.
-    Only fix tours of vehicle-days in specific_vd */
+    */
 
-    if (specific_vd == nil) {
-        fix_vd = {} ;
-        for [vd in 0...n_days * m]
-            fix_vd.add(vd);
+    fix_d = {};
+    if (days == nil) {
+        for [d in 0...n_days]
+            fix_d[d] = true;
+    } else {
+        for [d in days] {
+            fix_d[d] = true;
+        }
     }
-    else 
-        fix_vd = specific_vd ;
 
     tours_init = json.parse(solution_file)["tours"];
 
     for [d in 0...n_days] {
+        if (fix_d[d] == nil)
+            continue;
+
         for [v in allowed_vehicles] {
-
-            vd = v + d * m;
-
-            if (fix_vd[vd] == nil)
-                continue;
 
             key = d + ", " + v;
 
@@ -586,7 +594,7 @@ function set_initial_solution(solution_file, force, specific_vd) {
                     continue;
                 }
 
-                if (place["stop_type"] == "Livraison") {
+                if (place["stop_type"] == "Livraison" || place["stop_type"] == "Liv_Ramasse") {
                     index = -1 ;
                     for [c in 0...n] {
                         if (index_to_centre[c] == place["index"]) {
@@ -738,7 +746,7 @@ function set_same_visits(solution_file) {
                     continue;
                 }
 
-                if (place["stop_type"] == "Livraison") {
+                if (place["stop_type"] == "Livraison" || place["stop_type"] == "Liv_Ramasse") {
                     index = -1 ;
                     for [c in 0...n] {
                         if (index_to_centre[c] == place["index"]) {
@@ -800,7 +808,7 @@ function aggregate_tours() {
     return tours;
 }
 
-function write_solution() {
+function write_solution(outfile) {
     if (outfile == nil) return;
     local outf = io.openWrite(outfile);
 
@@ -848,7 +856,11 @@ function write_solution() {
                 } else if (node < n) {
                     place["index"] = index_to_centre[node];
                     place["name"] = centres[index_to_centre[node]]["name"];
-                    place["stop_type"] = "Livraison";
+                    if (is_ldr[d][v][trip][node]) {
+                        place["stop_type"] = "Liv_Ramasse";
+                    } else {
+                        place["stop_type"] = "Livraison";
+                    }
                     place["delivery"] = {
                         sum[i in 0...demands[node].count() : demands[node][i]["product_type"] == "A"](demands[node][i]["weight"] * visits_l[d][v][trip][node].value * delivers[d][v][trip][node][i].value),
                         sum[i in 0...demands[node].count() : demands[node][i]["product_type"] == "F"](demands[node][i]["weight"] * visits_l[d][v][trip][node].value * delivers[d][v][trip][node][i].value),
@@ -876,7 +888,7 @@ function write_solution() {
 }
 
 function output(){
-    write_solution();
+    write_solution(outfile);
 }
 
 
@@ -910,7 +922,7 @@ function callback(ls, cbType) {
         lastObjectiveValue = obj.value;
     }
     if (outfile != nil && stats.runningTime - lastBestRunningTime > 1 && !lastSolutionWritten) {
-        write_solution();
+        write_solution(outfile);
         println(">>>>>>> wrote solution to ", outfile);
         lastSolutionWritten = true ;
     }
@@ -941,7 +953,7 @@ function solve_multi(num_tries, time_limit) {
 function solve() {
     with(ls = localsolver.create()) {
         ls.addCallback("ITERATION_TICKED", callback);
-        ls.param.verbosity = 0 ;
+        ls.param.verbosity = 2 ;
         ls.param.seed = random.create().next(0, 10000);
 
         model();
@@ -950,7 +962,7 @@ function solve() {
         // set_current_tours();
 
         // Force the solution to match the input solution
-        // set_initial_solution(true, nil);
+        // set_initial_solution(initfile, true, nil);
 
         ls.model.close();
 
@@ -967,7 +979,7 @@ function solve() {
     }
 }
 
-function evaluate_flexibility(solution_file) {
+function evaluate_flexibility(solution_file, silent) {
     test_file = "problems/demands/test_demands.json";
     scenarios = json.parse(test_file);
 
@@ -987,12 +999,13 @@ function evaluate_flexibility(solution_file) {
     n_rec = {};
     for [scenario in scenarios.keys()] {
         sc_index += 1;
-        print("[EVAL] ", sc_index, "/", scenarios.count(), " ");
+        if (!silent)
+            print("[EVAL] ", sc_index, "/", scenarios.count(), " ");
         demands = read_demands(scenarios[scenario], n, index_to_centre);
 
         with(ls = localsolver.create()) {
             ls.param.verbosity = 0 ;
-            ls.param.timeLimit = 3 ;
+            ls.param.timeLimit = 2 ;
 
             model();
 
@@ -1005,26 +1018,30 @@ function evaluate_flexibility(solution_file) {
             for [v in allowed_vehicles] {
                 constraint used[v] == solution["vehicles_used"][v];
             }
-            // constraint n_recourses <= 4;
+            constraint n_recourses <= 5;
 
             ls.model.close();
             set_initial_solution(solution_file, false, nil);
 
             ls.solve();
-            print("       ", ls.solution.status);
+            if (!silent)
+                print("       ", ls.solution.status);
 
             summary[scenario]["status"] = ls.solution.status;
 
             if (ls.solution.status == "OPTIMAL" || ls.solution.status == "FEASIBLE") {
-                print("       cost=", round(total_costs.value));
+                if (!silent)
+                    print("       cost=", round(total_costs.value));
                 summary[scenario]["total_costs"] = total_costs.value;
-                print("       recourses=", n_recourses.value);
+                if (!silent)
+                    print("       recourses=", n_recourses.value);
                 summary[scenario]["recourses"] = n_recourses.value;
                 n_rec.add(n_recourses.value);
                 tours = aggregate_tours();
                 summary[scenario]["tours"] = tours;
             }
-            println();
+            if (!silent)
+                println();
         }
     }
 
@@ -1033,16 +1050,119 @@ function evaluate_flexibility(solution_file) {
                             (summary[scenario]["total_costs"]) 
                     / n_feasible;
 
-    println("Feasible: ", n_feasible, "/", scenarios.count());
-    println("Average cost: ", round(average_cost), "E");
-    println("Recourses: ", n_rec);
+    if (!silent) {
+        println("Feasible: ", n_feasible, "/", scenarios.count());
+        println("Average cost: ", round(average_cost), "E");
+        println("Recourses: ", n_rec);
+    }
 
     json.dump(summary, "solutions/flexibility/summary.json");
+    return sum[scenario in scenarios.keys()]
+        (summary[scenario]["status"] == "INFEASIBLE" ? 2000 : summary[scenario]["total_costs"]) / scenarios.count();
+}
+
+function optimize_bilevel(solution_file) {
+
+    original_score = 1340;
+    best_score = original_score;
+    best_solution = solution_file;
+    for [d in 0...n_days] {
+        print("[OPTIM] ", d, "/", n_days, " ");
+        for [iteration in 0...10] {
+            print("Current best score: ", round(best_score), "  |  improv=", round((original_score - best_score) / original_score * 100), "%");
+            println("   |   file: ", best_solution);
+            with(ls = localsolver.create()) {
+                ls.param.verbosity = 0 ;
+                ls.param.seed = random.create().next(0, 10000);
+                demands = read_demands(problem["demands"], n, index_to_centre);
+                model();
+                add_objectives();
+                days_to_fix = {};
+                for [d2 in 0...n_days] {
+                    if (d != d2) {
+                        days_to_fix.add(d2);
+                    }
+                }
+                set_initial_solution(best_solution, true, days_to_fix);
+                ls.model.close();
+                ls.param.timeLimit = 5 ;
+                // set_initial_solution(best_solution, false, {d});
+                ls.solve();
+
+                if (ls.solution.status == "INFEASIBLE") {
+                    continue;
+                }
+
+                tmp_file = "solutions/tmp" + iteration + ".json";
+                write_solution(tmp_file);
+            }
+
+            score = evaluate_flexibility(tmp_file, true);
+
+            if (score < best_score) {
+                best_score = score;
+                best_solution = tmp_file;
+            }
+        }
+    }
+    println("Best score: ", best_score);
+    println("Best solution: ", best_solution);
 }
 
 
+function lns(solution_file) {
+    original_score = 1340;
+    best_score = original_score;
+    best_solution = solution_file;
+    for [d in 0...n_days] {
+        print("[LNS] ", d, "/", n_days, " ");
+        for [iteration in 0...10] {
+            print("Current best score: ", round(best_score), "  |  improv=", round((original_score - best_score) / original_score * 100), "%");
+            println("   |   file: ", best_solution);
+            with(ls = localsolver.create()) {
+                ls.param.verbosity = 0 ;
+                ls.param.seed = random.create().next(0, 10000);
+                demands = read_demands(problem["demands"], n, index_to_centre);
+                model();
+                add_objectives();
+                days_to_fix = {};
+                for [d2 in 0...n_days] {
+                    if (d != d2) {
+                        days_to_fix.add(d2);
+                    }
+                }
+                set_initial_solution(best_solution, true, days_to_fix);
+                ls.model.close();
+                ls.param.timeLimit = 5 ;
+                if (iteration == 0) {
+                    set_initial_solution(best_solution, false, {d});
+                }
+                ls.solve();
+
+                if (ls.solution.status == "INFEASIBLE") {
+                    continue;
+                }
+
+                tmp_file = "solutions/tmp" + iteration + ".json";
+                write_solution(tmp_file);
+                score = ls.model.objectives[0].value;
+            }
+
+
+            if (score < best_score) {
+                best_score = score;
+                best_solution = tmp_file;
+            }
+        }
+    }
+    println("Best score: ", best_score);
+    println("Best solution: ", best_solution);
+}
+
+
+
 function parse_args(args) {
-    usage = "Usage: ls_solver problem_file -w week -i initsol -o outfile -t timelimit -e eval_file";
+    usage = "Usage: ls_solver problem_file -w week -i initsol -o outfile -t timelimit -e eval_file -b file_to_optimize";
     n_args = args.count();
     if (n_args == 0) {
         throw usage;
@@ -1069,6 +1189,9 @@ function parse_args(args) {
             } else if (arg == "-e") {
                 i += 1;
                 eval_file = args[i];
+            } else if (arg == "-b") {
+                i += 1;
+                file_to_optimize = args[i];
             } else {
                 println("Unknown argument: ", arg);
                 throw usage;
@@ -1102,22 +1225,31 @@ function main(args) {
     lastSolutionWritten = false;
     lastObjectiveValue = inf - 1;
 
+
+    if (file_to_optimize != nil) {
+        println("Optimizing solution ", file_to_optimize);
+        optimize_bilevel(file_to_optimize);
+        // lns(file_to_optimize);
+        return;
+    }
+
     if (eval_file != nil) {
         println("Evaluating file ", eval_file, " for problem ", problem_file);
-        evaluate_flexibility(eval_file);
-    } else {
-        println("Solving file ", problem_file, " for week ", week);
-        if (initfile != nil) {
-            println("   with initsol : ", initfile);
-        }
-        if (outfile != nil) {
-            println("   with outfile : ", outfile);
-        }
-        if (timelimit != nil) {
-            println("   with time limit : ", timelimit, " seconds");
-        }
-
-        solve();
-        // solve_multi(10, 10);
+        evaluate_flexibility(eval_file, false);
+        return;
+    } 
+    
+    println("Solving file ", problem_file, " for week ", week);
+    if (initfile != nil) {
+        println("   with initsol : ", initfile);
     }
+    if (outfile != nil) {
+        println("   with outfile : ", outfile);
+    }
+    if (timelimit != nil) {
+        println("   with time limit : ", timelimit, " seconds");
+    }
+
+    solve();
+    // solve_multi(10, 10);
 }

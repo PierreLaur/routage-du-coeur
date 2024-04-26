@@ -94,6 +94,16 @@ class Problem:
             Params.from_dict(dict["params"]),
         )
 
+    def get_index_by_name(self, name):
+        in_centres = [node.index for node in self.centres if node.name == name]
+        in_pdrs = [node.index for node in self.pdrs if node.name == name]
+        if in_centres:
+            return in_centres[0]
+        elif in_pdrs:
+            return in_pdrs[0] + self.n_centres
+        else:
+            raise ValueError(f"Node {name} not found in problem")
+
     @classmethod
     def from_files(
         cls,
@@ -163,9 +173,6 @@ class Problem:
         for v in range(m):
             if not frais[v] == "Oui":
                 vehicles[v].can_carry.remove(ProductType.F)
-        vehicles[0].can_carry.remove(
-            ProductType.S
-        )  # The PL (index 0) can't carry S products
 
         ## Process the centres info
 
@@ -207,6 +214,8 @@ class Problem:
                 jours[i] = jours_map[jours[i]]
             j_de_ramasse.append(jours)
 
+        palettes = points_de_ramasse_df["Palettes"].fillna(0).astype(int).tolist()
+
         product_types = points_de_ramasse_df["Type de produits"].to_list()
         pdrs = [
             PDR(
@@ -215,6 +224,7 @@ class Problem:
                 j_de_ramasse[i],
                 weights[i],
                 ProductType[product_types[i]],
+                palettes[i],
             )
             for i in range(n_pdr)
         ]
@@ -359,7 +369,7 @@ class Solution:
                 b = stop.index
                 arc_duration = duration(a, b, tour_duration)
                 tour_duration += arc_duration  # type: ignore
-                if stop.stop_type == StopType.Livraison:
+                if stop.stop_type in [StopType.Livraison, StopType.Liv_Ramasse]:
                     tour_duration += pb.params.wait_at_centres * 60
                 elif stop.stop_type == StopType.Ramasse:
                     tour_duration += pb.params.wait_at_pdrs * 60

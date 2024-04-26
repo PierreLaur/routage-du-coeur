@@ -47,7 +47,7 @@ def check_durations(pb: Problem, sol: Solution):
                 arc_duration = duration(a, b, tour_duration)
                 tour_duration += arc_duration
                 trip_duration += arc_duration
-                if stop.stop_type == StopType.Livraison:
+                if stop.stop_type in [StopType.Livraison, StopType.Liv_Ramasse]:
                     tour_duration += pb.params.wait_at_centres
                     trip_duration += pb.params.wait_at_centres
                 elif stop.stop_type == StopType.Ramasse:
@@ -138,7 +138,7 @@ def check_capacity_constraints(pb: Problem, sol: Solution):
                 sum(
                     sum(stop.delivery)
                     for stop in trip
-                    if stop.stop_type == StopType.Livraison
+                    if stop.stop_type in [StopType.Livraison, StopType.Liv_Ramasse]
                 )
                 <= pb.vehicles[v].capacity
             )
@@ -158,14 +158,18 @@ def check_capacity_constraints(pb: Problem, sol: Solution):
                 sum(
                     sum(stop.palettes)
                     for stop in trip
-                    if stop.stop_type == StopType.Livraison
+                    if stop.stop_type in [StopType.Livraison, StopType.Liv_Ramasse]
                 )
                 <= pb.vehicles[v].size
             )
 
             # Size limit for pickups (each pickup takes 2 palettes)
             assert (
-                sum(stop.stop_type == StopType.Ramasse for stop in trip) * 2
+                sum(
+                    pb.pdrs[stop.index - pb.n_centres].palettes
+                    for stop in trip
+                    if stop.stop_type == StopType.Ramasse
+                )
                 <= pb.vehicles[v].size
             )
 
@@ -217,7 +221,7 @@ def check_specific_requirements(pb: Problem, sol: Solution):
     assert not any(
         stop.name == "BESSIERES"
         for (_, v), tour in sol.tours.items()
-        if ProductType.F in pb.vehicles[v].can_carry
+        if ProductType.F in pb.vehicles[v].can_carry or v <= 1
         for stop in tour
     )
 
@@ -261,12 +265,19 @@ def check_specific_requirements(pb: Problem, sol: Solution):
                     done &= all(deliv == 0 for deliv in stop.delivery[:2])
                     if d not in pb.centres[c].allowed_days:
                         done &= stop.delivery[2] == 0
+                    done &= stop.stop_type == StopType.Liv_Ramasse
                     if done:
                         break
             if done:
                 break
 
         assert done
+
+    ### Leclerc Rouffiac with frigos except on Tuesdays
+    for (d, v), tour in sol.tours.items():
+        for stop in tour:
+            if stop.name == "LECLERC ROUFFIAC" and d != 1:
+                assert ProductType.F in pb.vehicles[v].can_carry
 
 
 def check_time_window_constraints(pb: Problem, sol: Solution):
@@ -298,18 +309,17 @@ def check_time_window_constraints(pb: Problem, sol: Solution):
 
             trip_used = True
 
-            if stop.stop_type == StopType.Livraison:
-                assert (
-                    d in pb.centres[stop.index].allowed_days
-                    or (d, v, trip, stop.index) in pb.livraisons_de_ramasses
-                )
-                if (d, v, trip, stop.index) not in pb.livraisons_de_ramasses:
+            match stop.stop_type:
+                case StopType.Livraison:
+                    assert d in pb.centres[stop.index].allowed_days
+                    assert (d, v, trip, stop.index) not in pb.livraisons_de_ramasses
                     n_visits[stop.index] += 1
-            else:
-                assert d in pb.pdrs[stop.index - pb.n_centres].required_days
-
-                # No pickups outside of first trip
-                assert trip == 0
+                case StopType.Ramasse:
+                    assert d in pb.pdrs[stop.index - pb.n_centres].required_days
+                    # No pickups outside of first trip
+                    assert trip == 0
+                case StopType.Liv_Ramasse:
+                    assert (d, v, trip, stop.index) in pb.livraisons_de_ramasses
 
     for c, n_vis in n_visits.items():
         if n_vis > 3:

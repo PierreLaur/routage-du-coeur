@@ -2,13 +2,15 @@ import argparse
 import subprocess
 
 
-def evaluate_flexibility(problem: str, solution):
+def evaluate_flexibility(problem: str, solution, week=1):
     command = [
         "localsolver",
         "models/ls_solver.lsp",
         problem,
         "-e",
         solution,
+        "-w",
+        str(week),
     ]
 
     try:

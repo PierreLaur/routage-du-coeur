@@ -7,6 +7,7 @@ import pandas as pd
 from utils.datatypes import Demand, Params, ProductType
 from numpy.random import Generator, PCG64
 from enum import Enum
+from scipy.stats import triang
 
 frais_sur_demi_palettes = [
     "L ISLE EN DODON",
@@ -35,14 +36,14 @@ def generate_weights(n_instances: int):
     instances = np.zeros((n_instances, n_centres, 3))
     for centre in range(n_centres):
         for product in range(3):
-            a, b, c = distributions.iloc[centre * 3 + product, 1:]
-            if a == c:
+            a, c, b = distributions.iloc[centre * 3 + product, 1:]
+            if a == b:
                 instances[:, centre, product] = a
             else:
                 instances[:, centre, product] = rng.triangular(
                     a,
-                    b,
                     c,
+                    b,
                     n_instances,
                 )
     instances = np.ceil(instances).astype(int)
@@ -157,9 +158,28 @@ def prepare_demands_max_no_split(demands_df: pd.DataFrame, params: Params):
     return demands
 
 
-if __name__ == "__main__":
-    n_instances = int(sys.argv[1])
+def make_weights(quantile, outfile):
+    distributions = pd.read_csv("data/demands/distributions.csv", index_col=0)
+    n_centres = distributions.index.unique().shape[0]
 
+    instance = np.zeros((n_centres, 3))
+    for centre in range(n_centres):
+        for product in range(3):
+            a, c, b = distributions.iloc[centre * 3 + product, 1:]
+            if a == b:
+                instance[centre, product] = a
+            else:
+                instance[centre, product] = triang.ppf(
+                    quantile, loc=a, scale=(b - a), c=(c - a) / (b - a)
+                )
+    instance = np.ceil(instance).astype(int)
+    instance = pd.DataFrame(
+        instance, index=distributions.index.unique(), columns=["A", "F", "S"]
+    )
+    instance.to_excel(outfile)
+
+
+def make_test_instances(n_instances: int, outfile="problems/demands/test_demands.json"):
     params = Params.from_dict(json.load(open("data/params.json")))
 
     scenarios = {}
@@ -169,4 +189,9 @@ if __name__ == "__main__":
         demands = prepare_demands(weights[i], params)
         scenarios[i] = {k: [d.to_dict() for d in demands[k]] for k in demands}
 
-    json.dump(scenarios, open("problems/demands/test_demands.json", "w"))
+    json.dump(scenarios, open(outfile, "w"))
+
+
+if __name__ == "__main__":
+    n_instances = int(sys.argv[1])
+    make_test_instances(n_instances)

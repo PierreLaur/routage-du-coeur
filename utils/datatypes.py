@@ -72,6 +72,7 @@ class PDR:
     required_days: set[int]
     weight: int
     product_type: ProductType
+    palettes: int
 
     def to_dict(self):
         d = asdict(self)
@@ -87,6 +88,7 @@ class PDR:
             set(d["required_days"]),
             d["weight"],
             ProductType[d["product_type"]],
+            d["palettes"],
         )
 
 
@@ -161,6 +163,7 @@ class Params:
 class StopType(Enum):
     Livraison = 0
     Ramasse = 1
+    Liv_Ramasse = 2
 
 
 @dataclass
@@ -178,7 +181,7 @@ class Stop:
             "name": self.name,
             "stop_type": self.stop_type.name,
         }
-        if self.stop_type == StopType.Livraison:
+        if self.stop_type in [StopType.Livraison, StopType.Liv_Ramasse]:
             d["delivery"] = self.delivery
             d["palettes"] = self.palettes
             d["norvegiennes"] = self.norvegiennes
@@ -192,7 +195,7 @@ class Stop:
             dict["name"],
             stoptype,
         )
-        if stoptype == StopType.Livraison:
+        if stoptype in [StopType.Liv_Ramasse, StopType.Livraison]:
             stop.delivery = tuple(dict["delivery"])
             stop.palettes = tuple(dict["palettes"])
             stop.norvegiennes = dict["norvegiennes"]

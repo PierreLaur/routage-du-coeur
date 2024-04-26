@@ -236,9 +236,15 @@ def make_solution(
         for node in tour[1:-1]:
             if node >= pb.n_centres:
                 name = pb.pdrs[node - pb.n_centres].name
+                stop_type = StopType.Ramasse
             else:
                 name = pb.centres[node].name
-            stop = Stop(node, name, StopType(node >= pb.n_centres))
+                stop_type = (
+                    StopType.Liv_Ramasse
+                    if (d, v, trip, node) in pb.livraisons_de_ramasses
+                    else StopType.Livraison
+                )
+            stop = Stop(node, name, stop_type)
 
             if node == 0:
                 trip += 1
@@ -604,9 +610,11 @@ def add_capacity_constraints(
                     <= 2 * pb.vehicles[v].size
                 )
 
-                # Two palettes per pickup
                 model.add(
-                    sum(2 * vars.visits[d, v, trip, p] for p in pb.pdr_nodes)
+                    sum(
+                        pb.pdrs[p - pb.n_centres].palettes * vars.visits[d, v, trip, p]
+                        for p in pb.pdr_nodes
+                    )
                     <= pb.vehicles[v].size
                 )
 
@@ -658,7 +666,7 @@ def add_specific_requirements(
 
     # The PL must visit Carrefour En Jacca on Wednesday
     # He must only do one pickup
-    carrefour_en_jacca_index = pb.n_centres + 6
+    carrefour_en_jacca_index = pb.get_index_by_name("CARREFOUR EN JACCA")
     model.add(vars.visits[2, 0, 0, carrefour_en_jacca_index] == 1)
     model.add_bool_and(
         vars.visits[2, 0, 0, p].negated()
@@ -668,7 +676,7 @@ def add_specific_requirements(
 
     # A camion Frigo must visit Carrefour la menude on Wednesday and Friday
     # To simplify we say it only does one pickup (in reality he delivers a centre afterwards)
-    carrefour_menude_index = pb.n_centres + 5
+    carrefour_menude_index = pb.get_index_by_name("CARREFOUR LA MENUDE")
     model.add(vars.visits[2, 6, 0, carrefour_menude_index] == 1)
     model.add_bool_and(
         vars.visits[2, 6, 0, p].negated()
@@ -684,7 +692,7 @@ def add_specific_requirements(
     )
 
     # The PL cannot deliver Toulouse/Grande-Bretagne
-    index_gde_bretagne = 24
+    index_gde_bretagne = pb.get_index_by_name("TOULOUSE GRANDE BRETAGNE")
     model.add_bool_and(
         vars.visits[d, 0, trip, index_gde_bretagne].negated()
         for d in range(pb.n_days)
@@ -692,7 +700,7 @@ def add_specific_requirements(
     )
 
     # both PLs cannot deliver Escalquens
-    index_escalquens = 8
+    index_escalquens = pb.get_index_by_name("ESCALQUENS")
     model.add_bool_and(
         vars.visits[d, v, trip, index_escalquens].negated()
         for d in range(pb.n_days)
@@ -700,19 +708,19 @@ def add_specific_requirements(
         for v in (0, 1)
     )
 
-    # Bessières cannot be delivered with camions frigos
-    index_bessieres = 3
+    # Bessières cannot be delivered with camions frigos or PL
+    index_bessieres = pb.get_index_by_name("BESSIERES")
     model.add_bool_and(
         vars.visits[d, v, trip, index_bessieres].negated()
         for d in range(pb.n_days)
         for v in pb.allowed_vehicles
+        if (ProductType.F in pb.vehicles[v].can_carry or v <= 1)
         for trip in range(pb.params.max_trips)
-        if ProductType.F in pb.vehicles[v].can_carry
-        and (d, v, trip, index_bessieres) in vars.visits
+        if (d, v, trip, index_bessieres) in vars.visits
     )
 
     # St Orens must be picked up with a specific CF (the smallest one, for height limit reasons)
-    index_st_orens = pb.n_centres + 1
+    index_st_orens = pb.get_index_by_name("LECLERC ST ORENS")
     model.add_bool_and(
         vars.visits[d, v, 0, index_st_orens].negated()
         for d in range(pb.n_days)
@@ -721,7 +729,7 @@ def add_specific_requirements(
     )
 
     # Fenouillet not too early
-    index_fenouillet = 9
+    index_fenouillet = pb.get_index_by_name("FENOUILLET")
     for d in range(pb.n_days):
         for v in pb.allowed_vehicles:
             for trip in range(pb.params.max_trips):
@@ -730,7 +738,7 @@ def add_specific_requirements(
                 ).only_enforce_if(vars.visits[d, v, trip, index_fenouillet])
 
     # Fronton in first only (they distribute food in the morning)
-    index_fronton = 11
+    index_fronton = pb.get_index_by_name("FRONTON")
     model.add_bool_and(
         vars.arcs[d, v, trip][c, index_fronton].negated()
         for d in range(pb.n_days)
@@ -761,6 +769,18 @@ def add_specific_requirements(
             if pb.demands[c][i].product_type != ProductType.S
             or d not in pb.centres[c].allowed_days
         )
+
+    # Leclerc Rouffiac with camions frigos except on Tuesdays
+    index_rouffiac = pb.get_index_by_name("LECLERC ROUFFIAC")
+    model.add_bool_and(
+        vars.visits[d, v, trip, index_rouffiac].negated()
+        for d in range(pb.n_days)
+        if d != 1
+        for v in pb.allowed_vehicles
+        if ProductType.F not in pb.vehicles[v].can_carry
+        for trip in range(pb.params.max_trips)
+        if (d, v, trip, index_rouffiac) in vars.visits
+    )
 
 
 def add_domsym_breaking(

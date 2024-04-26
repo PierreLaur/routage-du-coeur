@@ -1,7 +1,7 @@
 import pytest
 from ortools.sat.python import cp_model
 from models.cp_solver import solve_vrp
-from utils.problem import DeliveryWeek, Problem
+from utils.problem import Problem
 from utils.check_solution import check_solution
 from tests.conftest import problem_files
 

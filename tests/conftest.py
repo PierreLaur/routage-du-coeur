@@ -8,7 +8,8 @@ problem_files = [
     for f in [
         "fixe_usual_original.json",
         "fixe_usual_0226.json",
-        # "fixe_usual_median.json",
+        "fixe_usual_median.json",
+        "fixe_usual_q70.json",
         # "fixe_0226_original.json",
         # "fixe_0226_0226.json",
         # "fixe_0226_median.json",

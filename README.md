@@ -16,6 +16,9 @@ options :
 Check a solution file :  
 ```python -m utils.check_solution <problem file> <solution file>```
 
+Validate a solution file (generate 100 instances, check that the solution is valid with few changes in every instance):  
+```python validate.py <problem file> <solution file>```
+
 Create all possible JSON problem files from combinations of demands, week assignments and allowed days in problems/ subdirectories, using parameters in data/params.json :  
 ```python -m utils.make_problems```
 

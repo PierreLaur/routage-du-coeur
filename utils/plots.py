@@ -235,7 +235,7 @@ def print_to_txt(sol: Solution, output_file_path, display=False):
     jours_map = {0: "Lundi", 1: "Mardi", 2: "Mercredi", 3: "Jeudi", 4: "Vendredi"}
 
     output = ""
-    output += f"- - - - - - TOURNEES SEMAINE {sol.week} - - - - - -\n"
+    output += f"- - - - - - TOURNEES SEMAINE {sol.week.value} - - - - - -\n"
 
     n_days = len(set(k[0] for k in sol.tours))
 
@@ -258,12 +258,10 @@ def print_to_txt(sol: Solution, output_file_path, display=False):
                     name = "    [Retour Dépôt]"
                 elif stop.stop_type == StopType.Ramasse:
                     product_types = "Ramasse"
-
-                elif stop.stop_type == StopType.Livraison and all(
-                    deliv == 0 for deliv in stop.delivery
-                ):
-                    product_types = "Liv. ramasse"
                 else:
+                    if stop.stop_type == StopType.Liv_Ramasse:
+                        product_types = "Liv. ramasse"
+
                     for i, product_type in enumerate("AFS"):
                         deliv = stop.delivery[i]
                         if deliv > 0:

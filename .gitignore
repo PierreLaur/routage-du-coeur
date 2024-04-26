@@ -13,3 +13,7 @@ problems/*
 !*/**/distributions.csv
 !*/**/2602.json
 utils/rust-utils/
+solutions/*.json
+solutions/*.txt
+!solutions/best*
+!solutions/example*
